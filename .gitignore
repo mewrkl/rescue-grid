@@ -1,0 +1,14 @@
+# IntelliJ: share the project setup (module, JDK level, run button), ignore personal settings
+.idea/*
+!.idea/misc.xml
+!.idea/modules.xml
+!.idea/runConfigurations/
+out/
+*.class
+
+# Tool caches
+.impeccable/
+
+# OS junk
+Thumbs.db
+.DS_Store

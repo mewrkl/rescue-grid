@@ -29,9 +29,9 @@ On a Mac, run the game through Gradle as above, not by running `Main` directly: 
 |---|---|
 | WASD / arrow keys | Walk (hold to keep walking) |
 | 1 / 2 / 3, Tab | Switch to Medic / Engineer / Dog Handler, or cycle to the next |
-| Space | Special action on the tile you face (dashed outline) |
+| E | Special action on the tile you face (dashed outline) |
 | Esc | Pause (then R restarts, M goes to the menu) |
-| Menus | Mouse, or arrow keys / Tab to choose, Enter to press, Esc to go back |
+| Menus | Arrow keys or W/S to choose, Enter or Space to select, Esc to go back (the mouse works too) |
 
 ## Project layout
 
@@ -46,7 +46,7 @@ On a Mac, run the game through Gradle as above, not by running `Main` directly: 
 
 - **libGDX 1.14.2** with the **LWJGL3** desktop backend: the window, drawing (`SpriteBatch`, `ShapeRenderer`), the camera, the keyboard, and sound.
 - **Scene2D** (part of libGDX): menus, HUD, buttons and labels.
-- **FreeType** (`gdx-freetype`): text drawn from the Lato font.
+- **FreeType** (`gdx-freetype`): text drawn from two pixel fonts, Press Start 2P and Jersey 10.
 - **Gradle**: builds the project and downloads the libraries.
 - **JUnit 5**: tests for the game rules.
 

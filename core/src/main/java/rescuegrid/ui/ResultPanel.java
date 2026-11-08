@@ -2,82 +2,85 @@ package rescuegrid.ui;
 
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
-import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+import com.badlogic.gdx.utils.Align;
 
 import rescuegrid.logic.LevelData;
 import rescuegrid.logic.ScoreKeeper;
 import rescuegrid.model.GameBoard;
 
 /**
- * Shown when a mission ends: success or failure, survivors rescued, the score
- * with its breakdown, and buttons for Next Level, Retry and Main Menu.
+ * Shown when a mission ends, centred like the title screen:
+ *
+ *              MISSION COMPLETE
+ *     Level 1: rescued 2 of 3 survivors (needed 2)
+ *        Survivors rescued ............ 200
+ *        Health remaining ............. 240
+ *        ...
+ *                 SCORE 590
+ *              >  NEXT LEVEL  <
+ *                 PLAY AGAIN
+ *                 MAIN MENU
  */
 public class ResultPanel extends BaseScreen {
+
+    private static final float BREAKDOWN_WIDTH = 320;
 
     private final ScoreKeeper scoreKeeper;
     private final Label titleLabel;
     private final Label summaryLabel;
-    private final Label breakdownLabel;
+    private final Label[] pointLabels;
     private final Label scoreLabel;
-    private final TextButton nextLevel;
-    private final TextButton retry;
-    private final TextButton menu;
-    private final Table buttonRow;
-    private LevelData lastLevel;
+    private final MenuList menu;
 
     public ResultPanel(GameFrame game) {
         super(game);
         scoreKeeper = new ScoreKeeper();
-        root.pad(96);
-        root.defaults().left();
 
-        titleLabel = style.label(" ", 32, true, UiStyle.TEXT);
-        summaryLabel = style.label(" ", 14, false, UiStyle.TEXT_SECONDARY);
-        breakdownLabel = style.label(" ", 14, false, UiStyle.TEXT_SECONDARY);
-        scoreLabel = style.label(" ", 20, true, UiStyle.TEXT);
+        titleLabel = style.pixelLabel(" ", 32, UiStyle.TEXT);
+        summaryLabel = style.label(" ", UiStyle.TEXT_SECONDARY);
+        scoreLabel = style.pixelLabel(" ", 24, UiStyle.TEXT);
 
-        nextLevel = style.primaryButton("Next Level");
-        onPress(nextLevel, () -> game.startLevel(lastLevel.getNumber() + 1));
-        retry = style.secondaryButton("Retry Level");
-        onPress(retry, () -> game.startLevel(lastLevel.getNumber()));
-        menu = style.secondaryButton("Main Menu");
-        onPress(menu, game::showMenu);
-        buttonKeys.setBackAction(game::showMenu);
+        // Score breakdown: name on the left, points on the right.
+        String[] names = {"Survivors rescued", "Health remaining", "Everyone rescued bonus", "Time bonus"};
+        pointLabels = new Label[names.length];
+        Table breakdown = new Table();
+        for (int i = 0; i < names.length; i++) {
+            pointLabels[i] = style.label("0", UiStyle.TEXT);
+            pointLabels[i].setAlignment(Align.right);
+            breakdown.add(style.label(names[i], UiStyle.TEXT_SECONDARY)).left().expandX().padTop(4);
+            breakdown.add(pointLabels[i]).right().padTop(4).row();
+        }
 
-        buttonRow = new Table();
+        menu = createMenu();
+        menu.setBackAction(game::showMenu);
+
         root.add(titleLabel).row();
-        root.add(summaryLabel).padTop(8).row();
-        root.add(breakdownLabel).padTop(24).row();
-        root.add(scoreLabel).padTop(12).row();
-        root.add(buttonRow).padTop(32).row();
+        root.add(summaryLabel).padTop(16).row();
+        root.add(breakdown).width(BREAKDOWN_WIDTH).padTop(32).row();
+        root.add(scoreLabel).padTop(24).row();
+        root.add(menu).padTop(32).row();
+        root.add(hint("Arrow keys to choose  ·  Enter to select")).padTop(32).row();
     }
 
     public void showResult(boolean success, LevelData level, GameBoard board, double seconds) {
-        lastLevel = level;
         boolean finishedGame = success && !level.hasNextLevel();
-        titleLabel.setText(finishedGame ? "Every level cleared"
-                : success ? "Mission complete" : "Mission failed");
+        titleLabel.setText(finishedGame ? "ALL LEVELS CLEARED"
+                : success ? "MISSION COMPLETE" : "MISSION FAILED");
         summaryLabel.setText("Level " + level.getNumber() + ": rescued " + board.getRescuedCount()
-                + " of " + board.getSurvivors().size() + " survivors (needed " + level.getTarget() + ").");
+                + " of " + board.getSurvivors().size() + " survivors (needed " + level.getTarget() + ")");
 
-        breakdownLabel.setText("Survivors rescued: " + scoreKeeper.rescuePoints(board) + "\n"
-                + "Health remaining: " + scoreKeeper.healthPoints(board) + "\n"
-                + "Everyone rescued bonus: " + scoreKeeper.allRescuedBonus(board) + "\n"
-                + "Time bonus: " + scoreKeeper.timeBonus(seconds));
-        scoreLabel.setText("Score " + scoreKeeper.calculateScore(board, seconds));
+        pointLabels[0].setText(String.valueOf(scoreKeeper.rescuePoints(board)));
+        pointLabels[1].setText(String.valueOf(scoreKeeper.healthPoints(board)));
+        pointLabels[2].setText(String.valueOf(scoreKeeper.allRescuedBonus(board)));
+        pointLabels[3].setText(String.valueOf(scoreKeeper.timeBonus(seconds)));
+        scoreLabel.setText("SCORE " + scoreKeeper.calculateScore(board, seconds));
 
-        // Next Level only after a success, and only if there is another level.
-        boolean showNext = success && level.hasNextLevel();
-        nextLevel.setVisible(showNext);
-        retry.setText(success ? "Play Again" : "Retry Level");
-
-        // Rebuild the row so a hidden Next Level button leaves no gap.
-        buttonRow.clearChildren();
-        buttonRow.defaults().size(UiStyle.BUTTON_WIDTH, UiStyle.BUTTON_HEIGHT);
-        if (showNext) {
-            buttonRow.add(nextLevel).padRight(12);
+        // The first option is what the player most likely wants next.
+        menu.clearOptions();
+        if (success && level.hasNextLevel()) {
+            menu.addOption("NEXT LEVEL", () -> game.startLevel(level.getNumber() + 1));
         }
-        buttonRow.add(retry).padRight(12);
-        buttonRow.add(menu);
+        menu.addOption(success ? "PLAY AGAIN" : "TRY AGAIN", () -> game.startLevel(level.getNumber()));
+        menu.addOption("MAIN MENU", game::showMenu);
     }
 }

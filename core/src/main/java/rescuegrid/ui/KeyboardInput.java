@@ -11,7 +11,7 @@ import com.badlogic.gdx.InputAdapter;
  * keeping the held keys in a HashSet, the game loop can ask "is W held?" every
  * frame, which is what makes hold-to-walk work.
  *
- * wasPressed() is for one-shot keys like Space or Tab: it is true only once per
+ * wasPressed() is for one-shot keys like E or Tab: it is true only once per
  * press, even if the key is held down.
  *
  * Extends InputAdapter, libGDX's empty "do nothing" InputProcessor: we only

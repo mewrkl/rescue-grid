@@ -46,22 +46,22 @@ public class HudPanel extends Table {
         top().left().pad(24);
         defaults().left();
 
-        levelLabel = style.label("Level 1", 20, true, UiStyle.TEXT);
-        timeLabel = style.label("Time 0:00", 14, false, UiStyle.TEXT_SECONDARY);
-        aftershockLabel = style.label("Next aftershock", 14, false, UiStyle.TEXT_SECONDARY);
-        rescuedLabel = style.label("Rescued 0 / 0", 14, true, UiStyle.TEXT);
+        levelLabel = style.pixelLabel("LEVEL 1", 16, UiStyle.TEXT);
+        timeLabel = style.label("Time 0:00", UiStyle.TEXT_SECONDARY);
+        aftershockLabel = style.label("Next aftershock", UiStyle.TEXT_SECONDARY);
+        rescuedLabel = style.label("Rescued 0 / 0", UiStyle.TEXT);
 
         teamLabels = new Label[TEAM_SIZE];
         healthBars = new HealthBar[TEAM_SIZE];
         for (int i = 0; i < TEAM_SIZE; i++) {
-            teamLabels[i] = style.label(" ", 14, false, UiStyle.TEXT_SECONDARY);
+            teamLabels[i] = style.label(" ", UiStyle.TEXT_SECONDARY);
             healthBars[i] = new HealthBar(style.getWhitePixel(), Rescuer.MAX_HEALTH);
         }
 
-        activeNameLabel = style.label(" ", 16, true, UiStyle.TEXT);
-        specialLabel = style.label(" ", 14, false, UiStyle.TEXT_SECONDARY);
-        carryingLabel = style.label(" ", 14, false, UiStyle.TEXT_SECONDARY);
-        messageLabel = style.label(" ", 14, true, UiStyle.WARNING);
+        activeNameLabel = style.label(" ", UiStyle.TEXT);
+        specialLabel = style.label(" ", UiStyle.TEXT_SECONDARY);
+        carryingLabel = style.label(" ", UiStyle.TEXT_SECONDARY);
+        messageLabel = style.label(" ", UiStyle.WARNING);
         messageLabel.setWrap(true);
         messageLabel.setAlignment(Align.topLeft);
         messageShownAt = 0;
@@ -71,7 +71,7 @@ public class HudPanel extends Table {
         add(aftershockLabel).padTop(4).row();
         add(rescuedLabel).padTop(4).row();
 
-        add(style.label("TEAM", 12, true, UiStyle.TEXT_SECONDARY)).padTop(24).row();
+        add(style.pixelLabel("TEAM", 8, UiStyle.TEXT_SECONDARY)).padTop(24).row();
         for (int i = 0; i < TEAM_SIZE; i++) {
             Table teamRow = new Table();
             teamRow.add(teamLabels[i]).width(128).left();
@@ -79,20 +79,20 @@ public class HudPanel extends Table {
             add(teamRow).padTop(i == 0 ? 8 : 4).row();
         }
 
-        add(style.label("CONTROLLING", 12, true, UiStyle.TEXT_SECONDARY)).padTop(24).row();
+        add(style.pixelLabel("CONTROLLING", 8, UiStyle.TEXT_SECONDARY)).padTop(24).row();
         add(activeNameLabel).padTop(8).row();
         add(specialLabel).padTop(4).row();
         add(carryingLabel).padTop(4).row();
         add(messageLabel).width(CONTENT_WIDTH).height(64).padTop(24).row(); // room for 3 lines
 
         add().expandY().row(); // pushes the key hints to the bottom
-        add(style.label("WASD move · 1/2/3 switch", 12, false, UiStyle.TEXT_SECONDARY)).row();
-        add(style.label("Space special · Esc pause", 12, false, UiStyle.TEXT_SECONDARY)).padTop(4).row();
+        add(style.label("WASD move · 1/2/3 switch", UiStyle.TEXT_SECONDARY)).row();
+        add(style.label("E ability · Esc pause", UiStyle.TEXT_SECONDARY)).padTop(4).row();
     }
 
     /** Updates every label from the current game. Called every frame by GamePanel. */
     public void refresh(GameBoard board, Rescuer active, TurnManager turns, LevelData level) {
-        levelLabel.setText("Level " + level.getNumber());
+        levelLabel.setText("LEVEL " + level.getNumber());
         timeLabel.setText("Time " + formatTime(turns.getElapsedSeconds()));
 
         double untilAftershock = turns.getSecondsUntilAftershock();
@@ -108,10 +108,6 @@ public class HudPanel extends Table {
             boolean isActive = rescuer == active;
             teamLabels[i].setText((i + 1) + "  " + rescuer.getName() + (rescuer.isDowned() ? "  down" : ""));
             teamLabels[i].setColor(isActive ? UiStyle.TEXT : UiStyle.TEXT_SECONDARY);
-            Label.LabelStyle wanted = style.labelStyle(14, isActive);
-            if (teamLabels[i].getStyle() != wanted) {
-                teamLabels[i].setStyle(wanted);
-            }
             healthBars[i].setVisible(!rescuer.isDowned());
             healthBars[i].setHealth(rescuer.getHealth(), isActive ? UiStyle.TEXT : UiStyle.TEXT_SECONDARY);
         }
@@ -120,7 +116,7 @@ public class HudPanel extends Table {
         String readiness = active.canUseSpecial()
                 ? "ready"
                 : String.format("%.1f s", active.getSpecialCooldown());
-        specialLabel.setText("Space: " + active.getSpecialName() + " (" + readiness + ")");
+        specialLabel.setText("E: " + active.getSpecialName() + " (" + readiness + ")");
         carryingLabel.setText(active.isCarrying()
                 ? "Carrying survivor  " + active.getCarriedSurvivor().getCondition()
                         + " / " + active.getCarriedSurvivor().getMaxCondition()

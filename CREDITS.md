@@ -14,7 +14,8 @@ None yet. The game currently draws placeholder art in code (`drawFallback` in ea
 
 | File | Source (URL) | Author | Licence |
 |---|---|---|---|
-| `fonts/Lato-Regular.ttf`, `fonts/Lato-Bold.ttf` | https://github.com/google/fonts/tree/main/ofl/lato | Łukasz Dziedzic (tyPoland) | SIL Open Font License 1.1 (full text in `fonts/OFL-Lato.txt`) |
+| `fonts/PressStart2P-Regular.ttf` | https://github.com/google/fonts/tree/main/ofl/pressstart2p | The Press Start 2P Project Authors (CodeMan38) | SIL Open Font License 1.1 (full text in `fonts/OFL-PressStart2P.txt`) |
+| `fonts/Jersey10-Regular.ttf` | https://github.com/google/fonts/tree/main/ofl/jersey10 | The Soft Type Project Authors (Sarah Cadigan-Fried) | SIL Open Font License 1.1 (full text in `fonts/OFL-Jersey10.txt`) |
 
 ## Libraries
 

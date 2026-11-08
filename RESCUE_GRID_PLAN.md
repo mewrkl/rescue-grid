@@ -55,7 +55,7 @@ Our teacher asked us to build on **libGDX** and use libraries rather than plain 
 | Framework | **libGDX 1.14.2**, desktop backend **LWJGL3** (opens the window, OpenGL, OpenAL) |
 | Build | **Gradle 8.14** with the wrapper (`gradlew`), two modules: `core` (the game) and `lwjgl3` (the desktop launcher) |
 | Screens and UI | **Scene2D**, libGDX's UI library: `Stage`, `Table`, `Label`, `TextButton` |
-| Fonts | **FreeType** extension (`gdx-freetype`) turns `assets/fonts/Lato-*.ttf` into crisp text |
+| Fonts | **FreeType** extension (`gdx-freetype`): two pixel fonts: **Press Start 2P** (wide, chunky) for titles and menus, **Jersey 10** (narrower, readable) for sentences and the HUD |
 | Drawing | `SpriteBatch` for images and `ShapeRenderer` for the placeholder shapes, both wrapped in our `Painter` class |
 | Camera | libGDX `OrthographicCamera` (y-down, so row 0 is at the top), steered by our `Camera` class |
 | Game loop | libGDX calls `render(delta)` about 60 times a second |
@@ -124,7 +124,7 @@ The player has three rescuers. All share these stats:
 
 You control **one rescuer at a time**. Press 1, 2, 3 or Tab to switch, and the camera jumps to that rescuer. The others stay where they are, and **they can still be hurt** by fire and aftershocks. The HUD shows all three health bars so you notice.
 
-| Rescuer | Special action (Space) | Cooldown |
+| Rescuer | Special action (E) | Cooldown |
 |---|---|---|
 | Medic | Heals the survivor she is carrying, or a revealed survivor on the tile she is facing. Restores 8 condition, up to the max | 4 s *(tune)* |
 | Engineer | Clears the Rubble tile he is facing into Floor | 3 s *(tune)* |
@@ -295,7 +295,14 @@ All three levels were checked with a route script: every survivor can be reached
 4. **Pause overlay** (Esc): Resume, Restart Level, Main Menu.
 5. **Result Screen:** Success or Failure, survivors rescued, score breakdown, and buttons for Next Level, Retry, and Main Menu.
 
-`GameFrame` (a libGDX `Game`) switches screens with `setScreen(...)`. Every screen also works from the keyboard: arrow keys or Tab move a blue focus ring between buttons, Enter presses, Esc goes back.
+`GameFrame` (a libGDX `Game`) switches screens with `setScreen(...)`.
+
+**Menu style (2026-11-09, from researching game title screens):**
+- Everything centred: a big pixel-font title, a one-line tagline, then a short list of options (3 on the title screen).
+- The selected option is always visible: bigger, in the highlight colour, with `>` and `<` beside it. Up/Down or W/S moves, Enter or Space chooses, Esc goes back, and the mouse works too.
+- The title screen shows the real game behind the menu (a dimmed piece of Level 1, fire flickering) and the three rescuers under the title, a small nod to Soul Knight's lobby where the heroes stand around.
+- How to Play is three columns instead of paragraphs: the controls as keyboard keys, the team with their pictures, and the building's tiles with one line each. Players skip long text.
+- A small grey line at the bottom of each menu says which keys work.
 
 ### Camera view and minimap
 
@@ -321,8 +328,10 @@ All three levels were checked with a route script: every survivor can be reached
 |---|---|
 | WASD / arrow keys | Walk (hold to keep walking). Also turns to face that direction |
 | 1, 2, 3 or Tab | Switch to Medic / Engineer / Dog Handler, or cycle to the next |
-| Space | Special action on the faced tile (the Dog Handler needs no target) |
+| E | Special action on the faced tile (the Dog Handler needs no target) |
 | Esc | Pause |
+
+**Why E (changed from Space on 2026-11-09):** in PC games Q and E are the usual ability keys, and Space usually means jump or dash. Genshin Impact is the closest match to our design: a team switched with the number keys, and E for the active character's skill.
 
 Invalid special actions (on cooldown, nothing valid on the faced tile) show a short message in the HUD and change nothing.
 
@@ -348,7 +357,8 @@ core/                                              (the whole game, no desktop c
       Minimap.java
       KeyboardInput.java
       UiStyle.java          (colours, FreeType fonts, Scene2D button and label styles)
-      ButtonKeys.java       (new: keyboard control for menu buttons)
+      MenuList.java         (new: the centred, keyboard-and-mouse game menu)
+      IconSlot.java         (new: a space in a menu where game art is drawn)
       HealthBar.java        (new: a Scene2D Actor that draws health squares)
     graphics/
       Painter.java          (new: draws images and shapes for every Drawable)
@@ -506,7 +516,9 @@ These classes and their roles were promised in our proposal. Keep the names.
 - **`KeyboardInput`** (extends libGDX `InputAdapter`): keeps the keys currently held down in a `HashSet<Integer>`. `isHeld(int keycode)` lets `update()` ask "is W held?" every frame, which is what makes hold-to-walk work.
 - **`HudPanel`** (extends Scene2D `Table`): shows the information from Section 6. **`HealthBar`** (extends Scene2D `Actor`) draws the health squares.
 - **`MenuPanel`**, **`HowToPlayPanel`**, **`ResultPanel`**: the other screens.
-- **`UiStyle`**: colours, FreeType fonts, and the Scene2D styles for labels and buttons. **`ButtonKeys`**: arrow keys, Tab, Enter and Esc for the menu buttons.
+- **`UiStyle`**: colours, the two FreeType fonts, keycaps and label styles.
+- **`MenuList`** (extends Scene2D `Table`): the game menu. It keeps track of the selected option and handles both keyboard and mouse.
+- **`IconSlot`** (extends Scene2D `Actor`): an empty space in a layout. After the UI is drawn, the screen draws a tile or rescuer there with the same `draw()` the game uses.
 
 ### Asset classes
 
@@ -522,7 +534,7 @@ These classes and their roles were promised in our proposal. Keep the names.
 |---|---|
 | **Encapsulation** | `Rescuer` keeps `health`, `specialCooldown` and `moveTimer` private. They only change through `takeDamage()`, `startCooldown()` and `tick()`, so no other class can set invalid values. `Survivor` does the same with `condition`. |
 | **Inheritance** | `Medic`, `Engineer`, `DogHandler` extend `Rescuer`. `Floor`, `Wall`, `Rubble`, `Fire`, `Exit` extend `Tile`. `CrackedFloor` and `BurntFloor` extend `Floor` (two levels deep). |
-| **Polymorphism** | Pressing Space calls `activeRescuer.specialAction(board)` and the right subclass version runs. The draw loop calls `tile.draw(...)` on every tile without checking its type, and each tile's own `drawFallback` paints bricks, rocks or flames. On an aftershock, `HazardManager` calls `tile.onAftershock(board)` on every tile: only `CrackedFloor` reacts. Fire burnout works the same way through `onWorldTick`. |
+| **Polymorphism** | Pressing E calls `activeRescuer.specialAction(board)` and the right subclass version runs. The draw loop calls `tile.draw(...)` on every tile without checking its type, and each tile's own `drawFallback` paints bricks, rocks or flames. On an aftershock, `HazardManager` calls `tile.onAftershock(board)` on every tile: only `CrackedFloor` reacts. Fire burnout works the same way through `onWorldTick`. |
 | **Abstraction** | `Tile` and `Rescuer` are abstract with abstract methods. `GameBoard` and `MovementCalculator` work with any `Tile` without knowing which kind it is. |
 
 **Using the library's classes the OOP way:** our screens inherit from libGDX (`GameFrame extends Game`, `BaseScreen extends ScreenAdapter`, and the four screens extend `BaseScreen`), `HudPanel extends Table`, `HealthBar extends Actor` and overrides `draw`, and `KeyboardInput extends InputAdapter`. libGDX then calls our overridden methods (`render`, `keyDown`, `draw`) without knowing our classes, which is polymorphism from the other side.
@@ -594,7 +606,7 @@ To change a sound, edit its numbers in `tools/SoundMaker.java` and run `java too
 - Load every asset once at startup, never inside `render`. Textures, fonts and sounds must be `dispose()`d.
 - Pixel art: textures use the `Nearest` filter so 16 × 16 sprites stay sharp when drawn at 64 × 64.
 - Only draw tiles inside the camera window, roughly 190 tiles instead of 1200.
-- The font is **Lato** (SIL Open Font License), in `assets/fonts/`.
+- Fonts: **Press Start 2P** for titles and menus (always at a multiple of 8 px, unsmoothed, so its pixels stay square) and **Jersey 10** for longer text, always at 19 px, the size where its pixels line up with the screen's. Both use the SIL Open Font License and live in `assets/fonts/`.
 
 ### Licensing
 

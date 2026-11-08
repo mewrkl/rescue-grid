@@ -111,11 +111,11 @@ public class GamePanel extends BaseScreen {
         Table card = new Table();
         card.setBackground(style.card());
         card.defaults().left();
-        card.add(style.label("Paused", 24, true, UiStyle.TEXT)).colspan(2).padBottom(16).row();
+        card.add(style.pixelLabel("PAUSED", 24, UiStyle.TEXT)).colspan(2).padBottom(16).row();
         String[][] keysAndActions = {{"Esc", "Resume"}, {"R", "Restart level"}, {"M", "Main menu"}};
         for (String[] line : keysAndActions) {
-            card.add(style.label(line[0], 14, true, UiStyle.TEXT)).width(64).padTop(8);
-            card.add(style.label(line[1], 14, false, UiStyle.TEXT_SECONDARY)).width(160).padTop(8).row();
+            card.add(style.label(line[0], UiStyle.TEXT)).width(64).padTop(8);
+            card.add(style.label(line[1], UiStyle.TEXT_SECONDARY)).width(160).padTop(8).row();
         }
         card.setVisible(false);
         return card;
@@ -223,7 +223,8 @@ public class GamePanel extends BaseScreen {
             switchToNext();
         }
 
-        if (keys.wasPressed(Input.Keys.SPACE)) {
+        // E is the ability key, as in most PC games (Q and E are the usual ability keys).
+        if (keys.wasPressed(Input.Keys.E)) {
             try {
                 // Polymorphism: Java runs the Medic's, Engineer's or Dog Handler's version.
                 String result = activeRescuer.specialAction(board);
@@ -464,7 +465,7 @@ public class GamePanel extends BaseScreen {
         }
     }
 
-    /** A dashed outline on the tile the active rescuer faces: that's where Space acts. */
+    /** A dashed outline on the tile the active rescuer faces: that's where E acts. */
     private void drawFacedTile() {
         Tile faced = activeRescuer.getFacedTile(board);
         if (faced == null || state != GameState.PLAYING) {

@@ -1,0 +1,23 @@
+apply plugin: 'java-library'
+
+dependencies {
+    // libGDX itself: drawing, camera, input, sound, and the Scene2D UI library.
+    api "com.badlogicgames.gdx:gdx:$gdxVersion"
+    // FreeType: turns the .ttf font in assets/fonts into crisp text at any size.
+    api "com.badlogicgames.gdx:gdx-freetype:$gdxVersion"
+
+    // Unit tests for the game rules (they don't need a window).
+    testImplementation "org.junit.jupiter:junit-jupiter:$junitVersion"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+// The tests load the real level files, so put the assets folder on the test classpath.
+sourceSets.test.resources.srcDirs += [rootProject.file('assets').path]
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events 'failed'
+        exceptionFormat = 'full'
+    }
+}

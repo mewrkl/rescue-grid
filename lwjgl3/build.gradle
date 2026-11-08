@@ -1,0 +1,25 @@
+apply plugin: 'application'
+
+dependencies {
+    implementation project(':core')
+    // LWJGL3 is the desktop "backend": it opens the window and talks to OpenGL and OpenAL.
+    implementation "com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion"
+    // Native libraries (.dll/.so/.dylib) for Windows, Linux and Mac.
+    implementation "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
+    implementation "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-desktop"
+}
+
+// Levels, sounds, music, fonts and images live in the shared assets folder.
+sourceSets.main.resources.srcDirs += [rootProject.file('assets').path]
+
+application {
+    mainClass = 'rescuegrid.Main'
+}
+
+tasks.named('run') {
+    workingDir = rootProject.file('assets')
+    // macOS needs the window on the first thread.
+    if (System.getProperty('os.name').toLowerCase().contains('mac')) {
+        jvmArgs '-XstartOnFirstThread'
+    }
+}

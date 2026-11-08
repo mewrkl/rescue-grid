@@ -1,9 +1,16 @@
-# IntelliJ: share the project setup (module, JDK level, run button), ignore personal settings
+# IntelliJ: share only the JDK setting and the Run button; IntelliJ rebuilds the rest from Gradle
 .idea/*
 !.idea/misc.xml
-!.idea/modules.xml
 !.idea/runConfigurations/
+*.iml
 out/
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Java
 *.class
 
 # Tool caches

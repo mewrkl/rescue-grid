@@ -1,0 +1,14 @@
+// Settings shared by both modules.
+subprojects {
+    apply plugin: 'java'
+
+    repositories {
+        mavenCentral()
+    }
+
+    // Compile for Java 17, whatever (newer) JDK runs Gradle.
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+        options.release = 17
+    }
+}

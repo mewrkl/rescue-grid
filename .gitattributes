@@ -1,0 +1,8 @@
+# gradlew is a shell script: it must keep Unix line endings to run on Mac and Linux.
+gradlew      text eol=lf
+*.bat        text eol=crlf
+# Binary files: never touch their bytes.
+*.jar        binary
+*.wav        binary
+*.png        binary
+*.ttf        binary

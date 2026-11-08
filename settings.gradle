@@ -1,0 +1,5 @@
+// Two modules, the standard libGDX layout:
+//   core   - the whole game (rules, model, screens). Knows nothing about Windows/Mac.
+//   lwjgl3 - the desktop launcher: opens the window and starts the game from core.
+rootProject.name = 'RescueGrid'
+include 'core', 'lwjgl3'

@@ -1,6 +1,8 @@
-# Rescue Grid: Game Plan (v2)
+# Rescue Grid: Game Plan (v3)
 
 This document describes the game we are building, its rules, its class design, and how we want to build it. Read all of it before writing any code. If something here is unclear or seems wrong, ask before changing the design.
+
+> **What changed in v3 (2026-11-09): Swing → libGDX.** Our teacher asked us to use libGDX and libraries instead of Swing. The game rules, class names and OOP design are unchanged; only the window, drawing, input, sound and screens moved to libGDX. See section 3 and `decisions/0004`.
 
 > **What changed in v2 (2026-11-08), after teacher feedback**
 > - The game is now **real-time, tile by tile**. You hold WASD to walk, like a much simpler Soul Knight. Turns, action points (AP) and the End Turn button are gone.
@@ -25,7 +27,7 @@ This document describes the game we are building, its rules, its class design, a
 
 ### The one rule that matters most
 
-**All game logic, rules, features, and mechanics must be written by us in Java.** This includes the grid, movement, the game loop, the camera, fog, the minimap, hazards, scoring, and the win and lose conditions.
+**All game logic, rules, features, and mechanics must be written by us in Java.** This includes the grid, movement, the game loop logic, where the camera looks, fog, the minimap, hazards, scoring, and the win and lose conditions. libGDX gives us the window, drawing, keyboard, sound and UI widgets; it does not play the game for us.
 
 **Visual and audio assets can come from anywhere.** Sprites, tile art, character art, backgrounds, UI images, sound effects, and music may be downloaded or made with any tool, and they are the intended look of the game. Every `draw()` method keeps a simple colored fallback anyway. That lets us test in Week 1 before art exists, and a missing file never crashes the game (see Section 10).
 
@@ -45,25 +47,37 @@ The theme is based on real events. Cebu was hit by a magnitude 6.9 earthquake on
 
 ## 3. Tech Stack and Constraints
 
+Our teacher asked us to build on **libGDX** and use libraries rather than plain Swing (2026-11-09, see `decisions/0004`).
+
 | Item | Choice |
 |---|---|
-| Language | Java 17 or later |
-| UI | Java Swing (`JFrame`, `JPanel`, `paintComponent`) |
-| Game loop | One `javax.swing.Timer` (about 60 updates per second) |
-| Images | PNG, loaded with `ImageIO` |
-| Audio | WAV, played with `javax.sound.sampled` (`Clip`) |
-| Levels | `.txt` files in `resources/levels/` |
-| IDE | IntelliJ IDEA |
+| Language | Java 17 or later (the build compiles with `release 17`) |
+| Framework | **libGDX 1.14.2**, desktop backend **LWJGL3** (opens the window, OpenGL, OpenAL) |
+| Build | **Gradle 8.14** with the wrapper (`gradlew`), two modules: `core` (the game) and `lwjgl3` (the desktop launcher) |
+| Screens and UI | **Scene2D**, libGDX's UI library: `Stage`, `Table`, `Label`, `TextButton` |
+| Fonts | **FreeType** extension (`gdx-freetype`) turns `assets/fonts/Lato-*.ttf` into crisp text |
+| Drawing | `SpriteBatch` for images and `ShapeRenderer` for the placeholder shapes, both wrapped in our `Painter` class |
+| Camera | libGDX `OrthographicCamera` (y-down, so row 0 is at the top), steered by our `Camera` class |
+| Game loop | libGDX calls `render(delta)` about 60 times a second |
+| Images | PNG, loaded as libGDX `Texture`s |
+| Audio | WAV, played with libGDX `Sound` (effects) and `Music` (looping tracks) |
+| Levels | `.txt` files in `assets/levels/` |
+| Tests | **JUnit 5**, `gradlew test` (tests the rules without opening a window) |
+| IDE | IntelliJ IDEA, opened as a Gradle project |
 | Version control | Git and GitHub |
 
+**Possible extras, not built:**
+- **box2dlights:** a dark building with a light around each rescuer and glowing fires. It would suit the fog well. Kept as a "potential" until the core game is finished.
+- **Tiled maps (`.tmx`):** levels painted in the free Tiled editor and loaded with `TmxMapLoader`. Worth it once the real sprites give us a tileset to paint with. Until then we keep the `.txt` levels.
+
 **Do not use:**
-- Game engines or frameworks (libGDX, LWJGL, JavaFX game libraries, etc.)
-- Any external library for game logic
-- Databases, networking, or multiplayer
-- Threads. The one `javax.swing.Timer` runs on the Swing event thread, so the whole game runs on a single thread and we never have to think about thread safety.
+- Other engines or frameworks on top of libGDX.
+- libGDX's ready-made game-logic libraries: **Ashley** (entity system), **gdx-ai** (AI and pathfinding), **Box2D** physics. They would replace the class hierarchies, rules and recursion we are graded on.
+- Databases, networking, or multiplayer.
+- Threads. libGDX calls `render()` on one thread, so the whole game is single-threaded and we never have to think about thread safety.
 - Design patterns we have not learned yet (our teacher will introduce them later). Keep the structure to plain classes, inheritance, interfaces, and composition.
 
-**The game loop:** `GamePanel` owns exactly one timer: `new javax.swing.Timer(16, e -> { update(); repaint(); })`. Everything that changes over time (movement, cooldowns, fire, aftershocks, survivor condition) is driven from `update()`. No other timers.
+**The game loop:** libGDX calls `GamePanel.render(delta)` about 60 times a second, where `delta` is the seconds since the last frame. `render` first calls `update(delta)`, which moves everything that changes over time (movement, cooldowns, fire, aftershocks, survivor condition), then draws the new picture. No other timers.
 
 ---
 
@@ -80,7 +94,7 @@ All numbers marked *(tune)* are starting values. Change them during testing, and
 | Tile | Walkable | Burns | Notes |
 |---|---|---|---|
 | Floor | Yes | Yes | Can collapse into Rubble during an aftershock (random) |
-| CrackedFloor | Yes | Yes | **Always** collapses into Rubble on every aftershock. Placed on purpose across shortcuts |
+| CrackedFloor | Yes | No | **Always** collapses into Rubble on every aftershock. Placed on purpose across shortcuts. It doesn't burn, so fire can't remove the shortcut before the quake does |
 | Wall | No | No | Never changes |
 | Rubble | No | No | The Engineer can clear it into Floor |
 | Fire | No | – | Spreads every world tick. Hurts rescuers next to it. Burns out after 6 ticks *(tune)* |
@@ -92,7 +106,7 @@ All numbers marked *(tune)* are starting values. Change them during testing, and
 The game runs in real time, but the **world** only changes on a **world tick** every **3 seconds** *(tune)*. The world tick takes the place of the old End Turn. On each tick, `TurnManager` runs these steps **in exactly this order**:
 
 1. **Fire damage:** every active rescuer orthogonally next to a Fire tile takes 1 damage.
-2. **Fire spreads:** each Fire tile tries to spread to each orthogonal neighbour that burns (Floor or CrackedFloor), with a 25% chance each *(tune)*. Fire never spreads onto a tile with a rescuer on it.
+2. **Fire spreads:** each Fire tile tries to spread to each orthogonal neighbour that burns (plain Floor), with a 25% chance each *(tune)*. Fire never spreads onto a tile with a rescuer on it.
 3. **Fire burns out:** each Fire tile ages by 1. At age 6 it becomes BurntFloor.
 4. **Survivor condition:** every survivor not yet rescued loses 1 condition. Survivors at 0 are lost.
 5. **Aftershock countdown:** drops by 1, and an aftershock happens if it reaches 0 (see 4.5).
@@ -114,7 +128,7 @@ You control **one rescuer at a time**. Press 1, 2, 3 or Tab to switch, and the c
 |---|---|---|
 | Medic | Heals the survivor she is carrying, or a revealed survivor on the tile she is facing. Restores 8 condition, up to the max | 4 s *(tune)* |
 | Engineer | Clears the Rubble tile he is facing into Floor | 3 s *(tune)* |
-| Dog Handler | **Scent:** reveals every survivor within 8 walking steps. The scent follows corridors and does not pass through walls. Revealed survivors appear on the minimap. No target needed | 8 s *(tune)* |
+| Dog Handler | **Scent:** reveals every survivor within 8 walking steps. The scent follows corridors and passes through rubble, but not walls. Revealed survivors appear on the minimap. No target needed | 8 s *(tune)* |
 
 **Movement rules:**
 - Holding a direction key keeps walking. The rescuer always turns to face the key you pressed, even when blocked, so you can face rubble to clear it.
@@ -136,7 +150,7 @@ You control **one rescuer at a time**. Press 1, 2, 3 or Tab to switch, and the c
 - A survivor is **revealed** when it is inside the active rescuer's sight, or found by the Dog Handler's scent. Once revealed, it stays revealed and shows on the minimap.
 - **Picking up:** walking onto a survivor's tile with free hands picks it up automatically. A rescuer carries at most one survivor.
 - **Rescuing:** walking onto the Exit while carrying a survivor delivers it immediately.
-- **Condition:** starts at 20 and drops by 1 every world tick, so a survivor lasts 60 s if left alone *(tune)*. At 0 the survivor is lost. Carried survivors keep losing condition too, which is why the Medic matters.
+- **Condition:** drops by 1 every world tick. It starts at 20 / 25 / 30 in Levels 1 / 2 / 3, so a survivor lasts 60 / 75 / 90 s if left alone *(tune)*. Bigger buildings need more search time. At 0 the survivor is lost. Carried survivors keep losing condition too, which is why the Medic matters.
 - If fire spreads onto a survivor that is not being carried, that survivor is lost.
 
 ### 4.5 Aftershocks
@@ -176,7 +190,7 @@ The mission is a **success** if the number rescued is at least the level's targe
 
 ## 5. Level Format
 
-Levels are text files, one character per tile, stored in `resources/levels/level1.txt`, `level2.txt`, `level3.txt`.
+Levels are text files, one character per tile, stored in `assets/levels/level1.txt`, `level2.txt`, `level3.txt`.
 - `LevelLoader` reads the file into a `String[]` (one string per line), then turns that array into a `GameBoard`.
 - Keep those two steps as separate methods. Then you can also build a board straight from a `String[]` written in code, which is handy for quick tests.
 
@@ -243,11 +257,31 @@ Route lengths in tiles, checked with a script:
 - The storeroom survivor can't be reached at all until the Engineer clears `6,4`.
 - With the gap open, one rescuer doing all three rescues needs about 33 s of pure movement. Each survivor lasts 60 s, so the level is tight but fair, and the target is only 2 of 3.
 
-**Design Levels 2 and 3 with the same rules.** Each level must have:
+**Every level follows the same rules.** Each level must have:
 - at least one cracked-floor shortcut, plus a longer backup route,
 - at least one survivor that only the Engineer can reach,
 - at least one survivor in a side room that is easy to miss without the Dog Handler, and
 - every survivor still reachable after every cracked tile has collapsed (counting rubble as clearable).
+
+### Level 2 (35 × 25, 4 survivors, target 3): "Office floor"
+
+The map is in `assets/levels/level2.txt`.
+- **The shortcut:** a central corridor runs from the start straight to the exit, but a 3 × 3 block of cracked floor sits across its middle.
+- **After the quake:** the backup route climbs through the north-west room into the north corridor, then comes back down east of the crack.
+- **The Engineer:** the north-east room's only door is rubble.
+- **Side rooms:** the two south-side rooms are reached through other rooms, and a fire sits right next to the south-east survivor.
+
+Start to exit is 29 tiles with the shortcut and 51 without it.
+
+### Level 3 (40 × 30, 5 survivors, target 4): "Hospital wing"
+
+The map is in `assets/levels/level3.txt`.
+- **The shortcut:** the exit hall is at the top. The quickest way up from the ward is a two-tile cracked gap.
+- **After the quake:** the backup route goes round through the east room, nearly doubling the trip (32 tiles → 60).
+- **The Engineer:** the west room is behind rubble. More rubble doors connect the start room to the side wings as shortcuts.
+- **Pressure:** this level has four fires and the fastest aftershocks (every 27 s).
+
+All three levels were checked with a route script: every survivor can be reached and every rule above holds. It also estimates movement time to rescue the target number, about 19 s, 38 s and 50 s for the three levels, against 60, 75 and 90 s of survivor time.
 
 ---
 
@@ -261,7 +295,7 @@ Route lengths in tiles, checked with a script:
 4. **Pause overlay** (Esc): Resume, Restart Level, Main Menu.
 5. **Result Screen:** Success or Failure, survivors rescued, score breakdown, and buttons for Next Level, Retry, and Main Menu.
 
-Use `CardLayout` in `GameFrame` to switch screens.
+`GameFrame` (a libGDX `Game`) switches screens with `setScreen(...)`. Every screen also works from the keyboard: arrow keys or Tab move a blue focus ring between buttons, Enter presses, Esc goes back.
 
 ### Camera view and minimap
 
@@ -297,41 +331,38 @@ Invalid special actions (on cooldown, nothing valid on the faced tile) show a sh
 ## 7. Package Structure
 
 ```
-src/
-  rescuegrid/
-    Main.java
+settings.gradle, build.gradle, gradle.properties   (Gradle build: versions live in gradle.properties)
+gradlew, gradlew.bat, gradle/wrapper/              (run Gradle without installing it)
+core/                                              (the whole game, no desktop code)
+  build.gradle
+  src/main/java/rescuegrid/
     ui/
-      GameFrame.java
+      GameFrame.java        (extends libGDX Game: creates shared things, switches screens)
+      BaseScreen.java       (new: what every screen shares: Stage, root Table, keyboard buttons)
       MenuPanel.java
       HowToPlayPanel.java
-      GamePanel.java        (owns the game loop Timer)
-      HudPanel.java
+      GamePanel.java        (the game loop: update + draw)
+      HudPanel.java         (extends Scene2D Table)
       ResultPanel.java
-      Camera.java           (new)
-      Minimap.java          (new)
-      KeyboardInput.java    (new)
+      Camera.java
+      Minimap.java
+      KeyboardInput.java
+      UiStyle.java          (colours, FreeType fonts, Scene2D button and label styles)
+      ButtonKeys.java       (new: keyboard control for menu buttons)
+      HealthBar.java        (new: a Scene2D Actor that draws health squares)
+    graphics/
+      Painter.java          (new: draws images and shapes for every Drawable)
     model/
-      GameBoard.java
-      Survivor.java
-      Drawable.java
-      GameState.java
+      GameBoard.java, Survivor.java, Drawable.java, GameState.java, Direction.java
       tiles/
-        Tile.java
-        Floor.java
-        CrackedFloor.java   (new, extends Floor)
-        BurntFloor.java     (new, extends Floor)
-        Wall.java
-        Rubble.java
-        Fire.java
-        Exit.java
+        Tile.java, Floor.java, CrackedFloor.java, BurntFloor.java,
+        Wall.java, Rubble.java, Fire.java, Exit.java
       rescuers/
-        Rescuer.java
-        Medic.java
-        Engineer.java
-        DogHandler.java
+        Rescuer.java, Medic.java, Engineer.java, DogHandler.java
     logic/
       TurnManager.java      (runs the world tick)
       HazardManager.java
+      GameEvent.java        (what happened in a tick, for sounds and messages)
       MovementCalculator.java
       LevelLoader.java
       LevelData.java
@@ -340,14 +371,15 @@ src/
     assets/
       AssetManager.java
       SoundManager.java
-resources/
-  images/
-  sounds/
-  music/
-  levels/
-    level1.txt
-    level2.txt
-    level3.txt
+  src/test/java/rescuegrid/logic/                  (JUnit tests for the rules)
+lwjgl3/                                            (desktop launcher)
+  build.gradle
+  src/main/java/rescuegrid/Main.java               (opens the window)
+assets/                                            (shared by both modules)
+  levels/  level1.txt, level2.txt, level3.txt
+  sounds/  music/  images/  fonts/
+tools/
+  SoundMaker.java           (our own synthesizer: generates every WAV, not part of the game)
 CREDITS.md
 decisions/
 ```
@@ -367,19 +399,20 @@ These classes and their roles were promised in our proposal. Keep the names.
 - Abstract methods:
   - `boolean isWalkable()`
   - `boolean isFlammable()`
-  - `Color getFallbackColor()`
+  - `Color getFallbackColor()` (a libGDX `Color`)
   - `String getImageKey()`
 - Hook methods with a default "do nothing / false" body. Subclasses override only the ones they need.
   - `boolean isClearable()`: only `Rubble` returns `true`. The Engineer checks this.
   - `boolean isBurning()`: only `Fire` returns `true`. Fire damage and fire spread check this.
+  - `boolean isExit()`: only `Exit` returns `true`. Delivering survivors checks this.
   - `boolean canCollapse()`: only `Floor` returns `true`. Random aftershock collapses pick from these tiles.
   - `void onAftershock(GameBoard board)`: `CrackedFloor` replaces itself with `Rubble`.
   - `void onWorldTick(GameBoard board)`: `Fire` ages by one and replaces itself with `BurntFloor` at age 6.
-- Concrete method: `draw(...)` uses the image from `AssetManager`, or the fallback colour if the image is missing.
+- Concrete method: `draw(...)` uses the image from `AssetManager`. If the image is missing, it calls `drawFallback(...)`, the placeholder art made of shapes. Each subclass overrides `drawFallback` with its own details: bricks for `Wall`, rocks for `Rubble`, flickering flames for `Fire`, cracks for `CrackedFloor`.
 - Subclasses:
   - `Floor`, `Wall`, `Rubble`, `Fire`, `Exit` extend `Tile`.
   - `CrackedFloor` and `BurntFloor` extend **`Floor`**, which is two-level inheritance.
-  - `CrackedFloor` overrides `onAftershock`, `canCollapse` (to return `false`, since it always collapses anyway) and `getImageKey`.
+  - `CrackedFloor` overrides `onAftershock`, `isFlammable`, `canCollapse` (both `false`) and `getImageKey`.
   - `BurntFloor` overrides `isFlammable`, `canCollapse` and `getImageKey`.
 
 **`Rescuer`** (abstract, implements `Drawable`)
@@ -393,19 +426,22 @@ These classes and their roles were promised in our proposal. Keep the names.
   - `void startCooldown()`
   - `void takeDamage(int amount)`, `boolean isDowned()`
   - `double getStepDelay()`: 0.15 normally, 0.30 when carrying
-  - `pickUp(Survivor s)`, `Survivor dropSurvivor()`
+  - `pickUp(Survivor s)`, `Survivor dropSurvivor()`, `Survivor deliverSurvivor()`
   - `moveTo(int row, int col)` and `moveTo(Tile target)`: this is the overloading example
   - `Tile getFacedTile(GameBoard board)`
+  - `double getDrawRow()` and `getDrawCol()`: where to draw the rescuer mid-step. This gives smooth sliding, for example 5.5 halfway between rows 5 and 6.
 - Abstract methods:
-  - `void specialAction(GameBoard board) throws InvalidMoveException`. Each subclass finds its own target, usually `getFacedTile(board)`.
-  - `String getSpecialName()`
-  - `double getCooldownSeconds()`
+  - `String specialAction(GameBoard board) throws InvalidMoveException`. Each subclass finds its own target, usually `getFacedTile(board)`, and returns a short message for the HUD.
+  - `String getSpecialName()`, `String getSpecialSound()`, `double getCooldownSeconds()`
+  - `String getName()`, `String getImageKey()`, `Color getFallbackColor()`
+  - `void drawRoleIcon(...)`: each rescuer draws its own placeholder symbol (a cross, a hard hat or a paw).
 - Subclasses: `Medic`, `Engineer`, `DogHandler`
 
 ### Interface
 
 **`Drawable`**
-- `void draw(Graphics2D g, int x, int y, int size, AssetManager assets)`
+- `void draw(Painter painter, float x, float y, float size, AssetManager assets)`
+- `Painter` hides libGDX's two drawing tools (`SpriteBatch` for images, `ShapeRenderer` for shapes) behind simple methods: `image`, `fillRect`, `fillOval`, `fillPolygon`, `line`, `text`. Coordinates are y-down, like the level file.
 - Implemented by `Tile`, `Rescuer`, `Survivor`, and `Minimap`
 
 ### Model classes
@@ -438,37 +474,45 @@ These classes and their roles were promised in our proposal. Keep the names.
   - Runs the world tick (Section 4.2) every 3 s, in the exact order listed there.
   - Tracks elapsed time and the aftershock countdown for the HUD.
 - **`HazardManager`**: fire damage, fire spread, aftershocks. Uses one `java.util.Random` created with a seed per level, so bugs can be reproduced.
+- **`GameEvent`**: a small class with a `Type` enum (`RESCUER_HURT`, `AFTERSHOCK`, ...) and a message.
+  - The logic classes only *record* what happened during a tick.
+  - `GamePanel` then turns each event into a sound, a HUD message and screen shake.
+  - This keeps sound and drawing code out of the game rules.
 - **`LevelLoader`**: reads a `.txt` file into a `String[]`, then turns it into a `GameBoard`. Uses a `switch` on characters to build tile objects. This is the only place where tile types are chosen with a switch.
-- **`LevelData`**: per-level settings (file name, target, aftershock ticks, random seed).
+  - `parse(String[] rows)` and `parse(String[] rows, int survivorCondition)` are a second overloading example.
+- **`LevelData`**: per-level settings (file name, target, aftershock ticks, survivor condition, random seed).
 - **`ScoreKeeper`**: calculates the score from Section 4.7.
 - **`InvalidMoveException`**: custom checked exception, thrown by special actions that can't happen (on cooldown, no valid target). The UI catches it and shows the message in the HUD.
 
 ### UI classes
 
-- **`GameFrame`**: the `JFrame`, holds the `CardLayout`.
-- **`GamePanel`**: owns the game loop timer. Each frame it does two things:
-  - **`update()`:**
-    - works out the seconds since the last frame using `System.nanoTime()`,
+- **`GameFrame`** (extends libGDX `Game`): creates the shared `AssetManager`, `SoundManager`, `UiStyle` and `Painter` once, and switches screens with `setScreen(...)`. The name is kept from the proposal; in the Swing version it was the `JFrame`.
+- **`BaseScreen`** (abstract, extends libGDX `ScreenAdapter`): each screen has a Scene2D `Stage` and a root `Table`. `MenuPanel`, `HowToPlayPanel`, `GamePanel` and `ResultPanel` extend it.
+- **`GamePanel`**: libGDX calls its `render(delta)` each frame. It does two things:
+  - **`update(delta)`:**
     - reads `KeyboardInput` and steps the active rescuer if `canStep()`,
     - calls `tick()` on every rescuer,
-    - passes the elapsed time to `TurnManager`.
-  - **`paintComponent()`:**
+    - passes the elapsed time to `TurnManager`, then turns its `GameEvent`s into sounds, messages and shake.
+  - **Drawing:**
     - draws the tiles inside the camera window,
     - draws survivors (revealed only) and rescuers,
     - draws the fog: black for unexplored tiles, a dark see-through layer for remembered ones,
-    - draws the minimap.
+    - draws the minimap, then the HUD and pause card (Scene2D).
 - **`Camera`**:
-  - `follow(Rescuer r, int mapRows, int mapCols)` sets `offsetRow` and `offsetCol` so the rescuer is centred, clamped between 0 and `mapSize - viewSize`.
-  - Worked example: map 40 wide, view 15 wide, rescuer at col 20 → `offsetCol = 20 - 7 = 13`. A tile at col 25 is drawn at `x = (25 - 13) * 64 = 768`.
+  - `follow(row, col, mapRows, mapCols)` centres the view on the rescuer's draw position, clamped at the map edges.
+  - It works in pixels, so it glides along while the rescuer slides between tiles. It then points a libGDX `OrthographicCamera` at that spot, which does the screen maths.
+  - Worked example: the view is 15 tiles wide (960 px) and the rescuer is at col 20. Then `offsetX = 20 × 64 − (960 − 64) / 2 = 832`, and a tile at col 25 appears at screen `x = 25 × 64 − 832 = 768`.
 - **`Minimap`** (implements `Drawable`): loops over the whole grid and draws a 4 px square per explored tile, then dots for the exit, rescuers and revealed survivors.
-- **`KeyboardInput`** (a `KeyListener`): keeps the keys currently held down in a `HashSet<Integer>`. `isHeld(int keyCode)` lets `update()` ask "is W held?" every frame, which is what makes hold-to-walk work.
-- **`HudPanel`**: shows the information from Section 6.
+- **`KeyboardInput`** (extends libGDX `InputAdapter`): keeps the keys currently held down in a `HashSet<Integer>`. `isHeld(int keycode)` lets `update()` ask "is W held?" every frame, which is what makes hold-to-walk work.
+- **`HudPanel`** (extends Scene2D `Table`): shows the information from Section 6. **`HealthBar`** (extends Scene2D `Actor`) draws the health squares.
 - **`MenuPanel`**, **`HowToPlayPanel`**, **`ResultPanel`**: the other screens.
+- **`UiStyle`**: colours, FreeType fonts, and the Scene2D styles for labels and buttons. **`ButtonKeys`**: arrow keys, Tab, Enter and Esc for the menu buttons.
 
 ### Asset classes
 
-- **`AssetManager`**: loads all images once at startup into a `HashMap<String, BufferedImage>`. `getImage(key)` returns `null` if the image is missing, and never crashes.
-- **`SoundManager`**: plays sound effects and loops music. If a sound file is missing, it does nothing and does not crash.
+- **`AssetManager`**: loads all images once at startup into a `HashMap<String, TextureRegion>`. `getImage(key)` returns `null` if the image is missing, and never crashes. (Not libGDX's own class of the same name: ours is from the proposal.)
+- **`SoundManager`**: plays sound effects (libGDX `Sound`) and loops music (libGDX `Music`). If a sound file is missing, it does nothing and does not crash.
+- Both implement libGDX's `Disposable`: textures and sounds live outside Java's normal memory, so `GameFrame.dispose()` frees them when the window closes.
 
 ---
 
@@ -478,19 +522,21 @@ These classes and their roles were promised in our proposal. Keep the names.
 |---|---|
 | **Encapsulation** | `Rescuer` keeps `health`, `specialCooldown` and `moveTimer` private. They only change through `takeDamage()`, `startCooldown()` and `tick()`, so no other class can set invalid values. `Survivor` does the same with `condition`. |
 | **Inheritance** | `Medic`, `Engineer`, `DogHandler` extend `Rescuer`. `Floor`, `Wall`, `Rubble`, `Fire`, `Exit` extend `Tile`. `CrackedFloor` and `BurntFloor` extend `Floor` (two levels deep). |
-| **Polymorphism** | Pressing Space calls `activeRescuer.specialAction(board)` and the right subclass version runs. The draw loop calls `tile.draw(...)` on every tile without checking its type. On an aftershock, `HazardManager` calls `tile.onAftershock(board)` on every tile: only `CrackedFloor` reacts. Fire burnout works the same way through `onWorldTick`. |
+| **Polymorphism** | Pressing Space calls `activeRescuer.specialAction(board)` and the right subclass version runs. The draw loop calls `tile.draw(...)` on every tile without checking its type, and each tile's own `drawFallback` paints bricks, rocks or flames. On an aftershock, `HazardManager` calls `tile.onAftershock(board)` on every tile: only `CrackedFloor` reacts. Fire burnout works the same way through `onWorldTick`. |
 | **Abstraction** | `Tile` and `Rescuer` are abstract with abstract methods. `GameBoard` and `MovementCalculator` work with any `Tile` without knowing which kind it is. |
 
+**Using the library's classes the OOP way:** our screens inherit from libGDX (`GameFrame extends Game`, `BaseScreen extends ScreenAdapter`, and the four screens extend `BaseScreen`), `HudPanel extends Table`, `HealthBar extends Actor` and overrides `draw`, and `KeyboardInput extends InputAdapter`. libGDX then calls our overridden methods (`render`, `keyDown`, `draw`) without knowing our classes, which is polymorphism from the other side.
+
 Other concepts we want visible in the code:
-- An interface (`Drawable`, implemented by four unrelated classes)
+- An interface (`Drawable`, implemented by four unrelated classes; we also implement libGDX's `Disposable`)
 - Composition (`GameBoard` has a grid, rescuers have a carried survivor, `GamePanel` has a `Camera`, a `Minimap` and a `KeyboardInput`)
-- Enums (`GameState`, `Direction`)
+- Enums (`GameState`, `Direction`, `GameEvent.Type`)
 - Collections and generics (`ArrayList`, `HashMap`, `HashSet`, `List<Survivor>`)
 - A custom exception (`InvalidMoveException`)
 - Recursion (`MovementCalculator`'s flood fill, used for sight and scent)
 - Constructors calling `super(...)`
 - `@Override` on every overridden method
-- Method overloading (`moveTo(int row, int col)` and `moveTo(Tile target)`)
+- Method overloading (`moveTo(int row, int col)` and `moveTo(Tile target)`; `LevelLoader.parse(...)` with one or two parameters)
 
 **Avoid:** long `instanceof` or `switch` chains to decide behaviour by type. If a behaviour depends on the type, it belongs in an overridden method in the subclass, like the hook methods on `Tile`. The only allowed switch on tile type is in `LevelLoader`.
 
@@ -498,42 +544,72 @@ Other concepts we want visible in the code:
 
 ## 10. Assets
 
-### Rule
+### Decisions (2026-11-08, see `decisions/0003`)
 
-Sprites are the intended look. Download them or make them, and credit them. Every `draw()` method still falls back to a coloured rectangle (tiles) or a coloured circle with a letter (rescuers and survivors) when an image is missing. That way the game runs in Week 1 before any art exists, and a typo in a file name never crashes it.
+| What | Decision | Status |
+|---|---|---|
+| Art style | **2D top-down pixel art, 16 × 16 sprites drawn at 4× (64 px).** 3D would multiply the art work even in libGDX, so 2D pixel art it is. | Decided |
+| Placeholder art | Shapes drawn in Java (`drawFallback`): textured floor, brick walls, rock piles, flickering flames, a cracked-floor pattern, an EXIT door, rescuers with role icons, survivors as figures with a condition bar. | **Built, used for the first showing** |
+| Sprites | **Custom sprites made for us by Claude.** Each is written as a 16 × 16 grid of characters and turned into a PNG by a small Java tool (`tools/SpriteMaker.java`), the same idea as `SoundMaker`. No licences to track. | **Planned, not made yet. Wait for the team's go-ahead** |
+| Sounds and music | Generated by our own Java synthesizer, `tools/SoundMaker.java` (the same idea as the sfxr/jsfxr retro sound tools). It makes 17 effects and 2 chiptune loops. Any track can be swapped for a downloaded CC0 one by replacing the WAV file. | **Built** |
 
-Use a **top-down pixel-art** pack, so tiles and characters match.
+**The rule still holds:** every `draw()` falls back to the placeholder art when an image is missing, and a missing sound is simply silent. Dropping a correctly named PNG into `assets/images/` switches that object to the sprite, with no code changes.
 
-### Images needed (PNG, 64 by 64 unless noted)
+### Sprite plan (16 × 16, saved as PNG)
 
-- Tiles: `floor`, `cracked_floor`, `burnt_floor`, `wall`, `rubble`, `fire` (optional second frame `fire2` for flicker), `exit`
-- Rescuers: `medic`, `engineer`, `dog_handler`. Optional: 4 facing directions each, for example `medic_up`, `medic_down`.
-- Survivor: `survivor`, plus a small icon to show a rescuer is carrying someone
-- UI: `heart`, rescuer portraits for the HUD, menu background, game logo, button images (optional)
-- Drawn in code, not as images: the fog, the minimap, the cooldown bars, the active rescuer outline, the faced-tile highlight
+| Key | Look |
+|---|---|
+| `floor` | Grey-beige concrete, a few darker specks |
+| `cracked_floor` | Same concrete with dark zig-zag cracks |
+| `burnt_floor` | Charcoal floor with soot patches |
+| `wall` | Dark blue-grey bricks with a lighter top edge |
+| `rubble` | Pile of 4–5 grey-brown broken blocks |
+| `fire`, `fire2` | Two frames of orange/yellow flames on a dark-red base (they alternate for flicker) |
+| `exit` | Green door with a small white EXIT sign |
+| `medic` | Person in white with a red cross, red cap |
+| `engineer` | Person in an orange vest with a yellow hard hat |
+| `dog_handler` | Person in blue with a small brown dog beside them |
+| `survivor` | Person in a yellow shirt, one arm raised waving |
+| `carry_icon` | Tiny survivor head in a yellow circle (shown on a rescuer who is carrying someone) |
 
-### Sounds needed (WAV)
+Palette: muted greys and browns for the building; strong single colours for people (red, orange, blue, yellow) so they pop against the floor. Facing directions (`medic_up` etc.) are an extra, only if time allows.
 
-- Effects: button click, switch rescuer, footsteps, clear rubble, heal, dog bark (scent), pick up survivor, survivor rescued, fire spreading, aftershock warning, aftershock rumble, floor collapsing, rescuer damaged, rescuer downed, mission success, mission failure
-- Music: menu loop, gameplay loop
+### Sound list (all built, in `assets/sounds` and `assets/music`)
+
+- **Interface:** `click`, `switch`, `denied`
+- **Rescuers:** `step`, `bark` (Scent), `clear_rubble`, `heal`, `pickup`, `rescued`, `hurt`, `downed`
+- **Building:** `fire_spread` (soft crackle), `aftershock_warning` (rising rumble), `aftershock` (crash and rumble), `survivor_lost`
+- **End:** `success` (fanfare), `failure` (falling notes)
+- **Music:**
+  - `menu`: calm, about 46 s, A minor arpeggios with a melody on the second half.
+  - `gameplay`: tense, about 29 s, 132 BPM, with a driving bass, fast arpeggios and drums. A lead line joins halfway.
+
+To change a sound, edit its numbers in `tools/SoundMaker.java` and run `java tools/SoundMaker.java` from the project folder.
 
 ### Technical notes
 
-- Java Sound plays **WAV** natively but **not MP3 or OGG**. Convert audio to WAV (16-bit, 44.1 kHz or 22.05 kHz) with Audacity or any converter.
-- Music WAV files get large. Keep loops short (30 to 60 seconds) and consider mono at 22.05 kHz.
-- Load files from the classpath with `getClass().getResource("/images/floor.png")` so they work both in the IDE and in a JAR. In IntelliJ, mark the `resources` folder as a Resources Root.
-- Load every asset once at startup, never inside `paintComponent`.
-- Only draw tiles inside the camera window, roughly 165 tiles instead of 1200. That keeps the game smooth.
+- libGDX plays **WAV, OGG and MP3**. Our generated files are WAV. A downloaded OGG works too: change the extension in `SoundManager`.
+- `Sound` loads an effect fully into memory (keep effects short). `Music` streams from the file (use it for long loops).
+- Assets live in `assets/` and are loaded with `Gdx.files.internal("images/floor.png")`. Gradle runs the game with `assets/` as the working folder and also puts it on the classpath.
+- Load every asset once at startup, never inside `render`. Textures, fonts and sounds must be `dispose()`d.
+- Pixel art: textures use the `Nearest` filter so 16 × 16 sprites stay sharp when drawn at 64 × 64.
+- Only draw tiles inside the camera window, roughly 190 tiles instead of 1200.
+- The font is **Lato** (SIL Open Font License), in `assets/fonts/`.
 
 ### Licensing
 
-Free sources include Kenney.nl (CC0), OpenGameArt.org, itch.io free asset packs, and Freesound.org. Check each license before use and record every asset's source, author, and license in `CREDITS.md`.
+Our generated sounds and planned sprites are original, so there's nothing to license. If anything is ever downloaded instead, good free sources are Kenney.nl (CC0), OpenGameArt.org, itch.io free asset packs and Freesound.org. Check each licence before use, and record every asset's source, author and licence in `CREDITS.md`.
 
 ---
 
 ## 11. Build Order (4 Weeks)
 
 Every milestone must compile and run. Build a thin working version first, then add to it.
+
+> **Status (2026-11-09):** Weeks 1–4 are built on libGDX, except the sprites:
+> - The whole game is playable, from the menu through all three levels, with placeholder art, sound and music.
+> - 25 JUnit tests cover the rules (`gradlew test`).
+> - Still to do: the sprites (waiting for the go-ahead), playtesting, and tuning the numbers marked *(tune)*.
 
 ### Week 1: Walk around
 - Create all packages and class skeletons
@@ -575,7 +651,7 @@ Every milestone must compile and run. Build a thin working version first, then a
 |---|---|
 | Member 1 | `Tile` hierarchy (including `CrackedFloor` and `BurntFloor`), `GameBoard`, `LevelLoader`, `LevelData`, the level `.txt` files, `AssetManager`, `Camera`, `Minimap` |
 | Member 2 | `Rescuer` hierarchy, `MovementCalculator` (sight, scent, `canStep`), special actions, `Survivor`, `KeyboardInput` |
-| Member 3 | `GamePanel` game loop, `TurnManager`, `HazardManager`, `ScoreKeeper`, `HudPanel` and the other panels, `SoundManager` |
+| Member 3 | `GamePanel` game loop, `TurnManager`, `HazardManager`, `ScoreKeeper`, `HudPanel` and the other screens, `UiStyle`, `Painter`, `SoundManager` |
 | Everyone | Testing and bug fixing in Week 4, finding assets |
 
 Agree on method signatures in Week 1 so members can work in parallel without breaking each other's code. These ones matter most:
@@ -630,12 +706,12 @@ Extras we may add only after everything in Section 11 works:
 
 ## 15. How to Work With Us (Instructions for the AI)
 
-- We are 2nd-year students using Java for the first time. **Explain what each piece of code does and why**, especially anything new to beginners (the game loop, `System.nanoTime()`, key listeners, recursion).
+- We are 2nd-year students using Java for the first time. **Explain what each piece of code does and why**, especially anything new to beginners (the game loop and `delta`, libGDX screens and Scene2D, input processors, recursion).
 - Build in small steps that match the milestones in Section 11. After each step, the project should compile and run.
 - Keep methods short and readable. Use clear names. Add a short comment at the top of every class explaining its job.
 - Every field is `private` (or `protected` in an abstract parent when subclasses need it). Use getters and setters only when needed.
 - Always use `@Override` when overriding.
-- Do not add libraries, frameworks, or design patterns we did not ask for.
+- Use libGDX and the libraries listed in Section 3. Ask before adding any other library, framework, or design pattern.
 - Do not merge the class hierarchies into one class with a type field or a big switch. The hierarchies are the point of the project.
 - Do not rename the classes in Section 8 without asking, since they are in our submitted proposal.
 - If a rule or number in Section 4 turns out to be unbalanced or unclear during testing, point it out and suggest a change instead of silently changing it.

@@ -1,36 +1,81 @@
 # Rescue Grid
 
-A real-time, top-down rescue game in Java Swing. The full design is in [`RESCUE_GRID_PLAN.md`](RESCUE_GRID_PLAN.md), and the reasons behind the big decisions are in [`decisions/`](decisions/).
+A real-time, top-down rescue game built on **libGDX** (Java). Explore a building that collapsed in an earthquake, switch between three rescuers, and carry survivors to the exit while fire spreads and aftershocks block your paths.
+
+The full design is in [`RESCUE_GRID_PLAN.md`](RESCUE_GRID_PLAN.md), and the reasons behind the big decisions are in [`decisions/`](decisions/).
 
 ## Open and run
 
-1. In IntelliJ IDEA, open this folder (File → Open → `OOP_Project`).
-2. If IntelliJ says "Project JDK is not defined", choose any JDK 17 or newer, or let it download one (Corretto 22 works). The language level is already set to 17.
-3. Press the green Run button next to **Rescue Grid** at the top right, or run `rescuegrid.Main`.
+You need a JDK 17 or newer (IntelliJ can download one, for example Corretto). You don't need to install Gradle: the project brings its own (`gradlew`).
 
-The `resources` folder is already marked as a Resources Root, so `level1.txt` and any images you add are found automatically.
+**In IntelliJ IDEA:**
+1. File → Open → choose the `OOP_Project` folder. IntelliJ sees `build.gradle` and imports it as a Gradle project. The first import downloads Gradle and libGDX (about 150 MB), so it takes a few minutes.
+2. If it asks for a JDK, pick 17 or newer. (Settings → Build Tools → Gradle → Gradle JVM.)
+3. Press the green Run button next to **Rescue Grid** at the top right. That runs the Gradle task `lwjgl3:run`. You can also run it from the Gradle tool window: `RescueGrid → lwjgl3 → Tasks → application → run`.
 
-## What works now (skeleton)
+**From a terminal**, in the project folder:
 
-- All packages and classes from Section 7 of the plan, each with a comment explaining its job.
-- The menu, How to Play screen, game screen with HUD, and result screen. `CardLayout` switches between them.
-- `LevelLoader` builds Level 1 from `resources/levels/level1.txt` and gives a clear error for broken maps.
-- The full `Tile` hierarchy, drawn with fallback colours until sprites are added.
-- The game loop timer is running, the camera is centred on the active rescuer, and the HUD updates every frame.
-- Pressing Space already calls `specialAction()` and shows its message in the HUD. This is the polymorphism and exception wiring.
+```
+gradlew lwjgl3:run      (Windows)
+./gradlew lwjgl3:run    (Mac / Linux)
+gradlew test            (run the 25 rule tests)
+```
 
-## What to build next
+On a Mac, run the game through Gradle as above, not by running `Main` directly: the window needs a special Java setting there, and the Gradle task adds it for you.
 
-Search the code for `TODO (Week 1`. Each TODO says who owns it and gives the steps to follow.
+## Controls
 
-| Week 1 TODO | Owner | File |
-|---|---|---|
-| Hold-to-walk | Member 2 | `GamePanel.handleMovement()` |
-| `tick`, `getStepDelay`, `moveTo` | Member 2 | `Rescuer` |
-| One-step check | Member 2 | `MovementCalculator.canStep()` |
+| Key | Action |
+|---|---|
+| WASD / arrow keys | Walk (hold to keep walking) |
+| 1 / 2 / 3, Tab | Switch to Medic / Engineer / Dog Handler, or cycle to the next |
+| Space | Special action on the tile you face (dashed outline) |
+| Esc | Pause (then R restarts, M goes to the menu) |
+| Menus | Mouse, or arrow keys / Tab to choose, Enter to press, Esc to go back |
 
-**Week 1 is done when** you can walk a rescuer around Level 1 with the camera scrolling and walls blocking you.
+## Project layout
 
-## Adding art
+| Folder | What's in it |
+|---|---|
+| `core/` | The whole game: rules (`logic`, `model`), screens (`ui`), drawing (`graphics`), images and sounds (`assets`), and the JUnit tests |
+| `lwjgl3/` | The desktop launcher, `rescuegrid.Main`, which opens the window |
+| `assets/` | Levels, sounds, music, fonts, and images (empty until sprites are made) |
+| `tools/` | `SoundMaker.java`, our sound generator (not part of the game) |
 
-Put PNG files in `resources/images/`, named after the keys in `AssetManager` (for example `floor.png`, `medic.png`). They show up the next time you run. Record every asset in [`CREDITS.md`](CREDITS.md).
+## What's used besides plain Java
+
+- **libGDX 1.14.2** with the **LWJGL3** desktop backend: the window, drawing (`SpriteBatch`, `ShapeRenderer`), the camera, the keyboard, and sound.
+- **Scene2D** (part of libGDX): menus, HUD, buttons and labels.
+- **FreeType** (`gdx-freetype`): text drawn from the Lato font.
+- **Gradle**: builds the project and downloads the libraries.
+- **JUnit 5**: tests for the game rules.
+
+All the game rules (movement, sight, fire, aftershocks, survivors, scoring) are our own Java code.
+
+## What's built
+
+- All three levels (`assets/levels/level1.txt`–`level3.txt`), each checked to be solvable.
+- **Exploring:** real-time tile movement with smooth sliding, a following camera, recursive line-of-sight fog, and a minimap.
+- **Your team:** three rescuers with specials and cooldowns. Survivors are revealed, carried, delivered and healed.
+- **The building:**
+  - Fire spreads, hurts rescuers, and burns out.
+  - Aftershocks come with a warning, collapse cracked floor, cause random collapses, and shake the screen.
+- **Screens and scoring:** health, downed rescuers, win and lose, the score breakdown, plus menu, How to Play, pause and result screens.
+- **Placeholder art drawn in code:** brick walls, rock piles, flickering fire, and rescuers with role icons.
+- **Sound effects and music** generated by `tools/SoundMaker.java`.
+
+## Not built yet
+
+- **Sprites:** the 16 × 16 pixel-art sprites are planned in section 10 of the plan. Until they exist the game uses the placeholder art. To use a sprite, drop a PNG named after its key (for example `assets/images/medic.png`) and it appears automatically.
+- **Balancing:** every number marked *(tune)* in the plan needs playtesting.
+- **Possible extras:** box2dlights lighting, and Tiled maps once sprites exist (plan section 3).
+
+## Remaking the sounds
+
+From the project folder:
+
+```
+java tools/SoundMaker.java
+```
+
+This rewrites every WAV in `assets/sounds` and `assets/music`. Edit the numbers in `SoundMaker.java` to change a sound.

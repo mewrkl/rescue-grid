@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -79,5 +80,27 @@ class TurnManagerTest {
             }
         }
         assertTrue(burnt > 0, "some fire has burned out into burnt floor");
+    }
+
+    @Test
+    void theTeamCanOnlyLeaveOnceTheTargetIsRescued() {
+        LevelData level = LevelData.forLevel(1);
+        GameBoard board = new LevelLoader().load(level);
+        TurnManager turns = new TurnManager(board, new HazardManager(level.getSeed()), level);
+
+        assertFalse(turns.evacuate(), "can't leave with nobody rescued");
+        assertFalse(turns.isMissionOver());
+        assertEquals(level.getTarget(), turns.getStillNeeded());
+
+        for (int i = 0; i < level.getTarget(); i++) {
+            board.getSurvivors().get(i).markRescued();
+        }
+        assertEquals(0, turns.getStillNeeded());
+        assertFalse(turns.isMissionOver(), "a survivor is still inside, so the level waits for the player");
+        assertEquals(level.getSurvivorCount() - level.getTarget(), board.getStillInsideCount());
+
+        assertTrue(turns.evacuate());
+        assertTrue(turns.isMissionOver());
+        assertTrue(turns.isSuccess());
     }
 }

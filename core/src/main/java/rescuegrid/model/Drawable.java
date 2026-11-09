@@ -3,12 +3,7 @@ package rescuegrid.model;
 import rescuegrid.assets.AssetManager;
 import rescuegrid.graphics.Painter;
 
-/**
- * Anything that can draw itself on the screen.
- *
- * Tiles, rescuers, survivors and the minimap all implement this, so the game
- * screen can draw them without knowing what kind of object each one is.
- */
+/** Anything that can draw itself: tiles, rescuers, survivors, the minimap. */
 public interface Drawable {
 
     /**

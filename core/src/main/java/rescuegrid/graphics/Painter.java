@@ -13,16 +13,9 @@ import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.utils.Disposable;
 
 /**
- * The drawing toolbox every Drawable uses: images (sprites) and simple shapes
- * (rectangles, ovals, polygons, lines, text).
- *
- * libGDX draws images with a SpriteBatch and shapes with a ShapeRenderer, and
- * only one of them may be active at a time. Painter switches between them
- * for us, so a tile can draw an image and then a shape without caring.
- *
- * Coordinates are "y-down" like a text file: (0, 0) is the top-left, and y
- * grows downwards. The cameras in GamePanel are set up the same way, so a tile
- * at row r is simply drawn at y = r * 64.
+ * Draws images and simple shapes for every Drawable, switching between
+ * SpriteBatch and ShapeRenderer as needed. Coordinates are y-down: (0, 0) is
+ * the top-left corner.
  */
 public class Painter implements Disposable {
 
@@ -45,8 +38,6 @@ public class Painter implements Disposable {
         this.drawingShapes = false;
     }
 
-    // ----- Colours: the same 0-255 numbers we used before, turned into libGDX colours -----
-
     public static Color rgb(int red, int green, int blue) {
         return new Color(red / 255f, green / 255f, blue / 255f, 1f);
     }
@@ -59,8 +50,6 @@ public class Painter implements Disposable {
     public static Color hex(int rgb) {
         return rgb((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
     }
-
-    // ----- Start and finish a group of drawing -----
 
     /** Everything drawn until end() uses this camera's view. */
     public void begin(Matrix4 projection) {
@@ -104,15 +93,11 @@ public class Painter implements Disposable {
         }
     }
 
-    // ----- Images -----
-
     public void image(TextureRegion region, float x, float y, float width, float height) {
         useImages();
         batch.setColor(Color.WHITE);
         batch.draw(region, x, y, width, height);
     }
-
-    // ----- Rectangles -----
 
     public void fillRect(Color color, float x, float y, float width, float height) {
         useShapes();
@@ -142,8 +127,6 @@ public class Painter implements Disposable {
             fillRect(color, x + width - thickness, y + d, thickness, length);
         }
     }
-
-    // ----- Ovals -----
 
     /** An oval that fills the box (x, y, width, height). A square box gives a circle. */
     public void fillOval(Color color, float x, float y, float width, float height) {
@@ -204,8 +187,6 @@ public class Painter implements Disposable {
         return points;
     }
 
-    // ----- Polygons and lines -----
-
     /**
      * A filled convex polygon (no dents), given as x1, y1, x2, y2, ...
      * It is cut into triangles that all share the first corner.
@@ -232,8 +213,6 @@ public class Painter implements Disposable {
         shapes.setColor(color);
         shapes.rectLine(x1, y1, x2, y2, thickness);
     }
-
-    // ----- Text -----
 
     /** Small text centred on centerX, with its top at topY (used for the EXIT sign). */
     public void text(String text, Color color, float centerX, float topY) {

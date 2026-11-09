@@ -1,11 +1,6 @@
 package rescuegrid.model;
 
-/**
- * The four directions a rescuer can walk or face.
- *
- * Each direction knows how it changes the row and column, so movement code can
- * write "row + direction.getRowChange()" instead of four separate if-statements.
- */
+/** The four directions a rescuer can walk or face, with their row and column change. */
 public enum Direction {
     UP(-1, 0),
     DOWN(1, 0),

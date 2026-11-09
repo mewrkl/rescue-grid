@@ -8,13 +8,12 @@ import rescuegrid.model.Survivor;
 import rescuegrid.model.rescuers.Rescuer;
 
 /**
- * Keeps track of time and runs the "world tick": every TICK_SECONDS the
- * building gets worse (fire, survivor condition, aftershocks), always in the
- * same fixed order. The world tick replaced the old "End Turn" button.
+ * Keeps time and runs the world tick: every TICK_SECONDS the fire, survivors
+ * and aftershock countdown move forward, in a fixed order.
  */
 public class TurnManager {
 
-    public static final double TICK_SECONDS = 3.0;    // tune in testing
+    public static final double TICK_SECONDS = 3.0;
     public static final double WARNING_SECONDS = 5.0; // aftershock warning time
 
     private final GameBoard board;
@@ -26,6 +25,7 @@ public class TurnManager {
     private double secondsSinceTick;
     private int ticksUntilAftershock;
     private boolean warningGiven;
+    private boolean evacuated;
 
     public TurnManager(GameBoard board, HazardManager hazards, LevelData level) {
         this.board = board;
@@ -36,6 +36,7 @@ public class TurnManager {
         this.secondsSinceTick = 0;
         this.ticksUntilAftershock = level.getAftershockTicks();
         this.warningGiven = false;
+        this.evacuated = false;
     }
 
     /** Called every frame by GamePanel with the seconds since the last frame. */
@@ -49,11 +50,11 @@ public class TurnManager {
         }
         if (!warningGiven && getSecondsUntilAftershock() <= WARNING_SECONDS) {
             warningGiven = true;
-            events.add(new GameEvent(GameEvent.Type.AFTERSHOCK_WARNING, "Aftershock in 5 seconds! Get clear"));
+            events.add(new GameEvent(GameEvent.Type.AFTERSHOCK_WARNING, ""));
         }
     }
 
-    /** Everything that happens to the building once per tick, in EXACTLY this order (plan 4.2). */
+    /** Everything that happens to the building once per tick, in this order. */
     private void runWorldTick() {
         hazards.applyFireDamage(board, events);   // 1. damage before spreading
         hazards.spreadFire(board, events);        // 2.
@@ -84,8 +85,14 @@ public class TurnManager {
         }
     }
 
-    /** True when no survivors are left in the building, or every rescuer is downed. */
+    /**
+     * True when the team has left through the exit, no survivors are left in the
+     * building, or every rescuer is downed.
+     */
     public boolean isMissionOver() {
+        if (evacuated) {
+            return true;
+        }
         boolean survivorsLeft = false;
         for (Survivor survivor : board.getSurvivors()) {
             if (!survivor.isRescued() && !survivor.isLost()) {
@@ -103,7 +110,28 @@ public class TurnManager {
 
     /** True when at least the level's target number of survivors were rescued. */
     public boolean isSuccess() {
+        return isTargetReached();
+    }
+
+    public boolean isTargetReached() {
         return board.getRescuedCount() >= level.getTarget();
+    }
+
+    /** How many more survivors must be rescued before the team may leave (0 once the target is reached). */
+    public int getStillNeeded() {
+        return Math.max(0, level.getTarget() - board.getRescuedCount());
+    }
+
+    /**
+     * The team leaves the building, ending the mission. Only allowed once enough
+     * survivors are rescued, so it returns false (and does nothing) before that.
+     */
+    public boolean evacuate() {
+        if (!isTargetReached()) {
+            return false;
+        }
+        evacuated = true;
+        return true;
     }
 
     /** Hands over everything that happened since the last call, and forgets it. */

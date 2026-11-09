@@ -6,12 +6,7 @@ import com.badlogic.gdx.graphics.Color;
 
 import rescuegrid.graphics.Painter;
 
-/**
- * Normal floor. Rescuers can walk on it, fire can spread onto it, and a random
- * aftershock can collapse it into rubble.
- *
- * CrackedFloor and BurntFloor extend this class, because they are floors too.
- */
+/** Normal floor: walkable, can catch fire, and can collapse in an aftershock. */
 public class Floor extends Tile {
 
     private static final Color COLOR = Painter.rgb(196, 186, 166);

@@ -18,10 +18,14 @@ You need a JDK 17 or newer (IntelliJ can download one, for example Corretto). Yo
 ```
 gradlew lwjgl3:run      (Windows)
 ./gradlew lwjgl3:run    (Mac / Linux)
-gradlew test            (run the 25 rule tests)
+gradlew test            (run the 31 rule tests)
 ```
 
 On a Mac, run the game through Gradle as above, not by running `Main` directly: the window needs a special Java setting there, and the Gradle task adds it for you.
+
+## How to win a level
+
+Walk onto a survivor to pick them up, then walk onto the EXIT to save them. The **SURVIVORS** boxes in the sidebar fill up as you save people. The solid boxes are the ones you must save; the dashed ones are optional. Once you've saved enough, step onto the EXIT with empty hands to leave. You can also stay and save the rest for a bonus. Survivors start in different places each time you play.
 
 ## Controls
 
@@ -54,7 +58,7 @@ All the game rules (movement, sight, fire, aftershocks, survivors, scoring) are 
 
 ## What's built
 
-- All three levels (`assets/levels/level1.txt`–`level3.txt`), each checked to be solvable.
+- All three levels (`assets/levels/level1.txt`–`level3.txt`). Survivors are placed at random from spots marked `?` in each map, and every possible placement was checked to be solvable.
 - **Exploring:** real-time tile movement with smooth sliding, a following camera, recursive line-of-sight fog, and a minimap.
 - **Your team:** three rescuers with specials and cooldowns. Survivors are revealed, carried, delivered and healed.
 - **The building:**

@@ -4,18 +4,8 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.Matrix4;
 
 /**
- * Decides which part of the map is on screen. The map can be much bigger than
- * the window, so the camera keeps the active rescuer in the middle.
- *
- * libGDX's OrthographicCamera does the screen maths (turning map pixels into
- * screen pixels). Our Camera class decides WHERE it looks: centred on the
- * rescuer, but never past the edges of the map.
- *
- * offsetX is how many pixels of the map are scrolled off the left edge.
- * Worked example: tiles are 64 px and the view is 15 tiles wide (960 px). The
- * rescuer is at column 20, so we want them in the middle:
- *   offsetX = 20 * 64 - (960 - 64) / 2 = 1280 - 448 = 832.
- * A tile at column 25 (map x = 1600) then appears at screen x = 1600 - 832 = 768.
+ * Keeps the active rescuer in the middle of the view without scrolling past
+ * the map edges. libGDX's OrthographicCamera does the projection.
  */
 public class Camera {
 

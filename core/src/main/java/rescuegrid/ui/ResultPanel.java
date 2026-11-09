@@ -8,19 +8,7 @@ import rescuegrid.logic.LevelData;
 import rescuegrid.logic.ScoreKeeper;
 import rescuegrid.model.GameBoard;
 
-/**
- * Shown when a mission ends, centred like the title screen:
- *
- *              MISSION COMPLETE
- *     Level 1: rescued 2 of 3 survivors (needed 2)
- *        Survivors rescued ............ 200
- *        Health remaining ............. 240
- *        ...
- *                 SCORE 590
- *              >  NEXT LEVEL  <
- *                 PLAY AGAIN
- *                 MAIN MENU
- */
+/** The end-of-mission screen: result, score breakdown and what to do next. */
 public class ResultPanel extends BaseScreen {
 
     private static final float BREAKDOWN_WIDTH = 320;

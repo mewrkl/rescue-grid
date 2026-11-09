@@ -10,14 +10,8 @@ import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.GdxRuntimeException;
 
 /**
- * Plays sound effects and loops music, using libGDX's audio.
- *
- * libGDX has two kinds of audio:
- *   - Sound: short effects, loaded fully into memory, can play many at once.
- *   - Music: long tracks, streamed from the file while they play.
- *
- * Like AssetManager, a missing file is simply skipped: the game stays silent
- * instead of crashing. Our WAV files are made by tools/SoundMaker.java.
+ * Plays sound effects (libGDX Sound) and loops music (libGDX Music).
+ * A missing file is skipped, so the game stays silent instead of crashing.
  */
 public class SoundManager implements Disposable {
 

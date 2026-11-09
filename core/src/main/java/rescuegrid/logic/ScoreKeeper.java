@@ -4,7 +4,7 @@ import rescuegrid.model.GameBoard;
 import rescuegrid.model.rescuers.Rescuer;
 
 /**
- * Works out the score at the end of a level (plan section 4.7). Each part has
+ * Works out the score at the end of a level. Each part has
  * its own method so the result screen can show the breakdown.
  */
 public class ScoreKeeper {
@@ -12,7 +12,7 @@ public class ScoreKeeper {
     public static final int POINTS_PER_RESCUE = 100;
     public static final int POINTS_PER_HEALTH = 20;
     public static final int ALL_RESCUED_BONUS = 50;
-    public static final int TIME_BONUS_START = 120; // tune in testing
+    public static final int TIME_BONUS_START = 120;
 
     public int calculateScore(GameBoard board, double secondsTaken) {
         return rescuePoints(board) + healthPoints(board) + allRescuedBonus(board) + timeBonus(secondsTaken);

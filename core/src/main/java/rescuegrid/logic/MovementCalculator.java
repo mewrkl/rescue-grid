@@ -11,17 +11,12 @@ import rescuegrid.model.rescuers.Rescuer;
 import rescuegrid.model.tiles.Tile;
 
 /**
- * Answers "where can a rescuer go?" and "what can a rescuer reach?".
- *
- * The heart of this class is a RECURSIVE flood fill (explore). It spreads out
- * from the rescuer one step at a time, like water, and stops at walls. We use
- * it for two things:
- *   - sight: which tiles the active rescuer can see (fog of war)
- *   - scent: which survivors the Dog Handler's dog can smell
+ * Movement checks, plus a recursive flood fill used for sight (fog of war)
+ * and for the Dog Handler's scent.
  */
 public class MovementCalculator {
 
-    public static final int SIGHT_RANGE = 4; // walking steps, tune in testing
+    public static final int SIGHT_RANGE = 4; // walking steps
 
     /** Is a single step in this direction allowed right now? */
     public boolean canStep(GameBoard board, Rescuer rescuer, Direction direction) {
@@ -64,15 +59,8 @@ public class MovementCalculator {
     }
 
     /**
-     * The recursive flood fill.
-     *
-     * best[row][col] holds the most steps we had left when we reached that tile
-     * (-1 = not reached yet). It stops us exploring the same tile over and over.
-     *
-     * Example with stepsLeft = 2 from tile A in a corridor A-B-C-D:
-     *   explore(A, 2) marks A, calls explore(B, 1)
-     *   explore(B, 1) marks B, calls explore(C, 0) (and explore(A, 0), which stops at once)
-     *   explore(C, 0) marks C, then stops because no steps are left. D is never reached.
+     * Recursive flood fill. best[row][col] is the most steps we had left when we
+     * reached that tile (-1 = not reached), so no tile is explored twice for nothing.
      */
     private void explore(GameBoard board, int row, int col, int stepsLeft, int[][] best,
                          boolean passThroughRubble) {

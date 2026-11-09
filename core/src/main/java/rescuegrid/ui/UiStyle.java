@@ -13,6 +13,7 @@ import com.badlogic.gdx.graphics.g2d.NinePatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.ProgressBar;
 import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 import com.badlogic.gdx.scenes.scene2d.utils.NinePatchDrawable;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
@@ -22,17 +23,9 @@ import com.badlogic.gdx.utils.Disposable;
 import rescuegrid.graphics.Painter;
 
 /**
- * Shared colours, fonts and styles for every screen, so the menus, HUD and
- * result screen all look like the same game. Change a colour here and it
- * changes everywhere.
- *
- * Two pixel fonts, both turned into bitmap fonts at startup by FreeType:
- *   - Press Start 2P (wide and chunky) for titles and menu options,
- *   - Jersey 10 (narrower, easier to read) for sentences, the HUD and numbers.
- * Pixel fonts are only sharp at the size where one of their pixels lands on
- * exactly one screen pixel: multiples of 8 for Press Start 2P, and 19 for
- * Jersey 10 (its pixels are 75 units in a 1400-unit square: 1400 / 75 = 18.7).
- * At other sizes the pixels smear, so we only ever use those sizes.
+ * Colours, fonts and widget styles shared by every screen.
+ * Pixel fonts only stay sharp at whole-pixel sizes: multiples of 8 for
+ * Press Start 2P, and 19 for Jersey 10.
  */
 public class UiStyle implements Disposable {
 
@@ -51,6 +44,9 @@ public class UiStyle implements Disposable {
     private static final Color KEYCAP_BORDER = Painter.rgba(255, 255, 255, 51);
     private static final int CARD_RADIUS = 12;
     private static final int KEYCAP_RADIUS = 6;
+    private static final int TOAST_RADIUS = 8;
+    private static final float METER_HEIGHT = 6;
+    private static final Color METER_TRACK = Painter.rgba(255, 255, 255, 40);
 
     private static final String TEXT_FONT = "fonts/Jersey10-Regular.ttf";
     private static final String PIXEL_FONT = "fonts/PressStart2P-Regular.ttf";
@@ -64,6 +60,8 @@ public class UiStyle implements Disposable {
     private final BitmapFont signFont;
     private final TextureRegion whitePixel;
     private final Drawable keycapBackground;
+    private final Label.LabelStyle toastStyle;
+    private final ProgressBar.ProgressBarStyle meterStyle;
 
     public UiStyle() {
         fonts = new HashMap<>();
@@ -82,9 +80,14 @@ public class UiStyle implements Disposable {
 
         whitePixel = new TextureRegion(solidTexture(Color.WHITE));
         keycapBackground = padded(roundedBox(KEYCAP_FILL, KEYCAP_BORDER, 1, KEYCAP_RADIUS), 8, 4);
+        toastStyle = new Label.LabelStyle(find(TEXT_KEY), TEXT);
+        toastStyle.background = padded(roundedBox(SURFACE, BORDER, 1, TOAST_RADIUS), 16, 8);
+        meterStyle = new ProgressBar.ProgressBarStyle();
+        meterStyle.background = solid(METER_TRACK);
+        meterStyle.background.setMinHeight(METER_HEIGHT);
+        meterStyle.knobBefore = solid(Color.WHITE);
+        meterStyle.knobBefore.setMinHeight(METER_HEIGHT);
     }
-
-    // ----- Fonts -----
 
     private static final String TEXT_KEY = "text";
 
@@ -118,13 +121,7 @@ public class UiStyle implements Disposable {
         return signFont;
     }
 
-    // ----- Labels -----
-
-    /**
-     * Readable text (Jersey 10). Importance is shown by colour: TEXT for what
-     * matters, TEXT_SECONDARY for explanations. The colour can change while the
-     * game runs (setColor), e.g. the aftershock countdown turning orange.
-     */
+    /** Body text in Jersey 10. The colour can be changed later with setColor. */
     public Label label(String text, Color color) {
         Label label = new Label(text, textStyle());
         label.setColor(color);
@@ -158,7 +155,15 @@ public class UiStyle implements Disposable {
         return label;
     }
 
-    // ----- Shapes -----
+    /** A short message floating over the map (see Toast). */
+    public Label.LabelStyle toastStyle() {
+        return toastStyle;
+    }
+
+    /** A thin bar for Scene2D's ProgressBar: faint track, filled part tinted by the bar's colour. */
+    public ProgressBar.ProgressBarStyle meterStyle() {
+        return meterStyle;
+    }
 
     /** A 1 x 1 white image. Tinted and stretched, it draws any solid rectangle. */
     public TextureRegion getWhitePixel() {
@@ -219,8 +224,6 @@ public class UiStyle implements Disposable {
         textures.add(texture);
         return texture;
     }
-
-    // ----- Mouse cursor -----
 
     public void handCursor() {
         Gdx.graphics.setSystemCursor(Cursor.SystemCursor.Hand);

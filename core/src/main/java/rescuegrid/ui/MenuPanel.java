@@ -14,20 +14,7 @@ import rescuegrid.model.rescuers.DogHandler;
 import rescuegrid.model.rescuers.Engineer;
 import rescuegrid.model.rescuers.Medic;
 
-/**
- * The title screen. Everything is centred:
- *
- *                 RESCUE GRID
- *       An earthquake has collapsed the building...
- *            [Medic] [Engineer] [Dog Handler]
- *                >  START GAME  <
- *                  HOW TO PLAY
- *                     QUIT
- *        Arrow keys to choose · Enter to select
- *
- * Behind it, a dimmed piece of Level 1 is drawn with the real tiles (fire
- * flickers), so the first thing a player sees is the game's own world.
- */
+/** The title screen, drawn over a dimmed piece of Level 1. */
 public class MenuPanel extends BaseScreen {
 
     private static final int TILE = GamePanel.TILE_SIZE;

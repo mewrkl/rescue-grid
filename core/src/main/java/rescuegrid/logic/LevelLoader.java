@@ -6,6 +6,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Random;
 
 import rescuegrid.model.GameBoard;
 import rescuegrid.model.Survivor;
@@ -20,20 +23,22 @@ import rescuegrid.model.tiles.Rubble;
 import rescuegrid.model.tiles.Wall;
 
 /**
- * Turns a level text file into a GameBoard, one character per tile.
- *
- * Two steps, kept separate on purpose:
- *   1. readLines(): file -> String[]
- *   2. parse():     String[] -> GameBoard
- * So you can also build a quick test board straight from a String[] in code.
- *
- * This is the ONLY place in the game that uses a switch on the tile type.
+ * Reads a level text file (readLines) and turns it into a GameBoard (parse).
+ * 'S' is a survivor who is always there; '?' is a possible spot, and enough of
+ * them are picked at random to reach the level's survivor count.
+ * This is the only switch on tile types in the game.
  */
 public class LevelLoader {
 
-    /** Loads the map file named in the level's settings. */
+    /** Loads the map file named in the level's settings; random picks which '?' spots get a survivor. */
+    public GameBoard load(LevelData level, Random random) {
+        return parse(readLines(level.getFileName()), level.getSurvivorCondition(),
+                level.getSurvivorCount(), random);
+    }
+
+    /** Same, but always the same survivor spots (from the level's seed). Used by the tests. */
     public GameBoard load(LevelData level) {
-        return parse(readLines(level.getFileName()), level.getSurvivorCondition());
+        return load(level, new Random(level.getSeed()));
     }
 
     /** Reads a text file from the resources folder, skipping blank lines. */
@@ -59,16 +64,13 @@ public class LevelLoader {
         return lines.toArray(new String[0]);
     }
 
-    /** Builds a board with survivors at the default condition (handy for quick tests). */
+    /** Builds a board with default survivors and only the fixed 'S' ones. Used by tests. */
     public GameBoard parse(String[] rows) {
-        return parse(rows, Survivor.DEFAULT_CONDITION);
+        return parse(rows, Survivor.DEFAULT_CONDITION, countSymbol(rows, 'S'), new Random(0));
     }
 
-    /**
-     * Builds a board from rows of characters. Throws a clear error if the map is
-     * broken. (Overloaded: same name as the method above, one extra parameter.)
-     */
-    public GameBoard parse(String[] rows, int survivorCondition) {
+    /** Builds a board from rows of characters. Throws a clear error if the map is broken. */
+    public GameBoard parse(String[] rows, int survivorCondition, int survivorCount, Random random) {
         checkShape(rows);
         checkCount(rows, 'X', "exit (X)");
         checkCount(rows, 'M', "Medic start (M)");
@@ -81,8 +83,33 @@ public class LevelLoader {
                 placeTile(board, rows[row].charAt(col), row, col, survivorCondition);
             }
         }
+        for (int[] spot : pickSurvivorSpots(rows, survivorCount, random)) {
+            board.addSurvivor(new Survivor(spot[0], spot[1], survivorCondition));
+        }
         addRescuers(board, rows);
         return board;
+    }
+
+    /**
+     * Chooses which '?' spots get a survivor: shuffle all the spots, then take
+     * as many from the front as we still need after the fixed 'S' survivors.
+     */
+    private List<int[]> pickSurvivorSpots(String[] rows, int survivorCount, Random random) {
+        List<int[]> spots = new ArrayList<>();
+        for (int row = 0; row < rows.length; row++) {
+            for (int col = 0; col < rows[row].length(); col++) {
+                if (rows[row].charAt(col) == '?') {
+                    spots.add(new int[] {row, col});
+                }
+            }
+        }
+        int needed = survivorCount - countSymbol(rows, 'S');
+        if (needed < 0 || needed > spots.size()) {
+            throw new IllegalArgumentException("Level needs " + survivorCount + " survivors, but has "
+                    + countSymbol(rows, 'S') + " fixed (S) and " + spots.size() + " possible spots (?)");
+        }
+        Collections.shuffle(spots, random);
+        return spots.subList(0, needed);
     }
 
     /** Creates the right Tile object for one character. */
@@ -92,6 +119,7 @@ public class LevelLoader {
                 board.replaceTile(row, col, new Wall(row, col));
                 break;
             case '.':
+            case '?': // a possible survivor spot; pickSurvivorSpots() decides if someone is here
             case 'M':
             case 'E':
             case 'D':
@@ -154,6 +182,15 @@ public class LevelLoader {
 
     /** The symbol must appear exactly once. */
     private void checkCount(String[] rows, char symbol, String description) {
+        int count = countSymbol(rows, symbol);
+        if (count != 1) {
+            throw new IllegalArgumentException("Level needs exactly one " + description
+                    + ", but found " + count);
+        }
+    }
+
+    /** How many times the symbol appears in the whole map. */
+    private int countSymbol(String[] rows, char symbol) {
         int count = 0;
         for (String row : rows) {
             for (int col = 0; col < row.length(); col++) {
@@ -162,10 +199,7 @@ public class LevelLoader {
                 }
             }
         }
-        if (count != 1) {
-            throw new IllegalArgumentException("Level needs exactly one " + description
-                    + ", but found " + count);
-        }
+        return count;
     }
 
     /** Returns {row, col} of the first place the symbol appears. */

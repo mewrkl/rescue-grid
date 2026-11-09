@@ -7,12 +7,7 @@ import com.badlogic.gdx.scenes.scene2d.Actor;
 
 import rescuegrid.graphics.Painter;
 
-/**
- * A row of small squares, one per health point: filled = health left, faint = lost.
- *
- * Extends Actor, the base class of everything in a Scene2D stage, and overrides
- * draw() to paint itself (inheritance and polymorphism inside the library).
- */
+/** One small square per health point: filled for health left, faint for lost. */
 class HealthBar extends Actor {
 
     private static final float SQUARE = 10;

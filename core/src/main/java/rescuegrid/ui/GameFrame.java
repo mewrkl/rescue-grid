@@ -9,13 +9,8 @@ import rescuegrid.logic.LevelData;
 import rescuegrid.model.GameBoard;
 
 /**
- * The whole game. Extends libGDX's Game class, which shows one Screen at a
- * time: setScreen(menuPanel) hides the current screen and shows the menu.
- * (In the Swing version this was the JFrame with a CardLayout; the name is
- * kept from our proposal.)
- *
- * It creates the shared things once (images, sounds, fonts, the Painter) and
- * every screen borrows them through the getters.
+ * The game: switches between screens and owns the shared images, sounds,
+ * fonts and Painter.
  */
 public class GameFrame extends Game {
 

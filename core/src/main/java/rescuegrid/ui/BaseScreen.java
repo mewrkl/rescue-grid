@@ -18,17 +18,9 @@ import rescuegrid.graphics.Painter;
 import rescuegrid.model.Drawable;
 
 /**
- * What every screen has in common: a Scene2D Stage (the UI "scene" that holds
- * labels and menus), a root Table that lays them out, an optional MenuList the
- * keyboard controls, and icon slots where game art is drawn.
- *
- * Abstract: the game only ever creates a MenuPanel, HowToPlayPanel, GamePanel
- * or ResultPanel. Each subclass builds its own layout in its constructor.
- *
- * Each frame: drawBackground() (empty here, the title screen overrides it),
- * then the Scene2D UI, then the icons.
- *
- * Extends ScreenAdapter, libGDX's empty Screen, so we only override what we use.
+ * Shared parts of every screen: a Scene2D Stage, a root Table, an optional
+ * MenuList, and icon slots where game art is drawn. Draws the background,
+ * then the UI, then the icons.
  */
 abstract class BaseScreen extends ScreenAdapter {
 
@@ -113,7 +105,7 @@ abstract class BaseScreen extends ScreenAdapter {
     }
 
     /** Draws each icon where Scene2D placed its slot, with the same Painter the game uses. */
-    private void drawIcons() {
+    protected void drawIcons() {
         if (icons.isEmpty()) {
             return;
         }

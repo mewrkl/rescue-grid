@@ -8,15 +8,12 @@ import rescuegrid.graphics.Painter;
 import rescuegrid.model.GameBoard;
 
 /**
- * A burning tile. Blocks movement, hurts rescuers standing next to it, and
- * spreads every world tick (HazardManager does the spreading).
- *
- * Each fire remembers how many ticks it has burned. After BURN_OUT_TICKS it
- * replaces itself with BurntFloor, which reopens the path.
+ * A burning tile. Blocks movement, hurts rescuers next to it, and becomes
+ * BurntFloor after BURN_OUT_TICKS world ticks.
  */
 public class Fire extends Tile {
 
-    public static final int BURN_OUT_TICKS = 6; // tune in testing
+    public static final int BURN_OUT_TICKS = 6;
 
     private static final Color COLOR = Painter.rgb(110, 34, 18);
     private static final Color OUTER_FLAME = Painter.rgb(236, 96, 28);

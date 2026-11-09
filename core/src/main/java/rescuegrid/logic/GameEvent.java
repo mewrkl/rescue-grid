@@ -1,12 +1,8 @@
 package rescuegrid.logic;
 
 /**
- * Something that happened during a world tick that the player should hear or
- * see: a rescuer got burned, an aftershock hit, a survivor was lost...
- *
- * The logic classes only RECORD events. GamePanel reads them afterwards and
- * decides which sound to play and what message to show. This keeps sound and
- * screen code out of the game rules.
+ * Something that happened during a world tick, such as a rescuer getting
+ * burned. The logic records events; GamePanel turns them into sounds and messages.
  */
 public class GameEvent {
 

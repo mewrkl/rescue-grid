@@ -7,15 +7,12 @@ import rescuegrid.assets.AssetManager;
 import rescuegrid.graphics.Painter;
 
 /**
- * A trapped person. Starts hidden in the fog, loses condition every world tick,
- * and is lost at 0. A rescuer carries them to the Exit to save them.
- *
- * All fields are private: condition can only change through tickCondition()
- * and heal(), so it can never go below 0 or above maxCondition.
+ * A trapped person. Hidden in the fog at first, loses condition every world
+ * tick, and is lost at 0. Condition only changes through tickCondition() and heal().
  */
 public class Survivor implements Drawable {
 
-    public static final int DEFAULT_CONDITION = 20; // 20 ticks x 3 s = 60 s, tune in testing
+    public static final int DEFAULT_CONDITION = 20; // 20 ticks x 3 s = 60 s
 
     private static final Color SKIN = Painter.rgb(232, 190, 150);
     private static final Color SHIRT = Painter.rgb(236, 196, 40);
@@ -66,8 +63,6 @@ public class Survivor implements Drawable {
         revealed = true;
     }
 
-    // ----- State changes, called by Rescuer and HazardManager -----
-
     public void markCarried() {
         carried = true;
     }
@@ -92,8 +87,6 @@ public class Survivor implements Drawable {
     public void markLost() {
         lost = true;
     }
-
-    // ----- Getters -----
 
     public int getRow() {
         return row;

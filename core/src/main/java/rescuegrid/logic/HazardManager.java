@@ -14,20 +14,15 @@ import rescuegrid.model.tiles.Rubble;
 import rescuegrid.model.tiles.Tile;
 
 /**
- * Makes the building dangerous: fire damage, fire spreading and burning out,
- * and aftershocks that turn floor into rubble.
- *
- * Uses one Random with a fixed seed per level, so the same level plays out the
- * same way each time. That makes bugs reproducible.
- *
- * IMPORTANT: when changing tiles, we first COLLECT the changes in a list, then
- * APPLY them. If we changed tiles while still looping over the grid, a tile that
- * just caught fire could spread again in the same tick.
+ * Fire damage, fire spreading and burning out, and aftershocks.
+ * Uses one seeded Random per level so a level plays out the same way each time.
+ * Tile changes are collected first and applied afterwards, so a tile that just
+ * caught fire can't spread again in the same tick.
  */
 public class HazardManager {
 
-    public static final double SPREAD_CHANCE = 0.25; // tune in testing
-    public static final int RANDOM_COLLAPSES = 3;    // tune in testing
+    public static final double SPREAD_CHANCE = 0.25;
+    public static final int RANDOM_COLLAPSES = 3;
 
     private final Random random;
 
@@ -39,14 +34,14 @@ public class HazardManager {
     public void applyFireDamage(GameBoard board, List<GameEvent> events) {
         for (Rescuer rescuer : board.getRescuers()) {
             if (!rescuer.isDowned() && isNextToFire(board, rescuer.getRow(), rescuer.getCol())) {
-                hurt(rescuer, 1, rescuer.getName() + " is getting burned! Move away from the fire", events);
+                hurt(rescuer, 1, rescuer.getName() + " is burning", events);
             }
         }
     }
 
     /** Step 2: each fire tries to spread to each flammable neighbour (SPREAD_CHANCE each). */
     public void spreadFire(GameBoard board, List<GameEvent> events) {
-        // 1. COLLECT the tiles that will catch fire.
+        // 1. Collect the tiles that will catch fire.
         List<Tile> catching = new ArrayList<>();
         boolean[][] alreadyChosen = new boolean[board.getRows()][board.getCols()];
         for (Tile tile : allTiles(board)) {
@@ -67,7 +62,7 @@ public class HazardManager {
                 }
             }
         }
-        // 2. APPLY the changes.
+        // 2. Apply the changes.
         for (Tile tile : catching) {
             board.replaceTile(tile.getRow(), tile.getCol(), new Fire(tile.getRow(), tile.getCol()));
             Survivor survivor = board.getSurvivorAt(tile.getRow(), tile.getCol());
@@ -84,11 +79,11 @@ public class HazardManager {
     /** Step 3: call onWorldTick on every tile. Only Fire reacts (it burns out). */
     public void burnOutFires(GameBoard board) {
         for (Tile tile : allTiles(board)) {
-            tile.onWorldTick(board); // polymorphism: most tiles do nothing
+            tile.onWorldTick(board); // most tiles do nothing
         }
     }
 
-    /** Step 5: the aftershock (plan section 4.5). */
+    /** Step 5: the aftershock. */
     public void triggerAftershock(GameBoard board, List<GameEvent> events) {
         // 1. Every tile hears about the aftershock. Only CrackedFloor reacts (it becomes Rubble).
         for (Tile tile : allTiles(board)) {
@@ -120,18 +115,15 @@ public class HazardManager {
                 hurt(rescuer, 1, "", events);
             }
         }
-        events.add(new GameEvent(GameEvent.Type.AFTERSHOCK,
-                "AFTERSHOCK! Cracked floors collapsed. Find another way, or clear the rubble"));
+        events.add(new GameEvent(GameEvent.Type.AFTERSHOCK, "The cracked floor collapsed"));
     }
-
-    // ----- Helpers -----
 
     /** Damages a rescuer. If that downs them, they drop whoever they were carrying. */
     private void hurt(Rescuer rescuer, int amount, String message, List<GameEvent> events) {
         rescuer.takeDamage(amount);
         if (rescuer.isDowned()) {
             rescuer.dropSurvivor();
-            events.add(new GameEvent(GameEvent.Type.RESCUER_DOWNED, rescuer.getName() + " is down!"));
+            events.add(new GameEvent(GameEvent.Type.RESCUER_DOWNED, rescuer.getName() + " is down"));
         } else {
             events.add(new GameEvent(GameEvent.Type.RESCUER_HURT, message));
         }

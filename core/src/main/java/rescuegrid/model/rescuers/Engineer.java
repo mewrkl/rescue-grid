@@ -28,7 +28,7 @@ public class Engineer extends Rescuer {
         }
         Tile target = getFacedTile(board);
         if (target == null || !target.isClearable()) {
-            throw new InvalidMoveException("Nothing to clear. Face a rubble tile");
+            throw new InvalidMoveException("Face rubble to clear it");
         }
         board.replaceTile(target.getRow(), target.getCol(), new Floor(target.getRow(), target.getCol()));
         startCooldown();

@@ -8,12 +8,7 @@ import java.util.List;
 import rescuegrid.model.rescuers.Rescuer;
 import rescuegrid.model.tiles.Tile;
 
-/**
- * The whole building: the grid of tiles, plus the rescuers and survivors in it.
- *
- * GameBoard is an example of composition: it HAS a grid, it HAS rescuers, it
- * HAS survivors. It works with any Tile without knowing which kind it is.
- */
+/** The building: a grid of tiles plus the rescuers and survivors in it. */
 public class GameBoard {
 
     private final Tile[][] grid;
@@ -49,10 +44,8 @@ public class GameBoard {
     }
 
     /**
-     * Swaps the tile at (row, col) for a new tile object. This is how fire
-     * spreads, fire burns out, rubble is cleared and cracked floor collapses.
-     * The new tile keeps the old one's "explored" flag, so the fog doesn't
-     * come back over a tile just because it changed.
+     * Replaces a tile (fire spreading, rubble cleared, floor collapsing).
+     * The new tile keeps the old one's explored flag so the fog doesn't return.
      */
     public void replaceTile(int row, int col, Tile newTile) {
         Tile oldTile = grid[row][col];
@@ -92,6 +85,21 @@ public class GameBoard {
         return count;
     }
 
+    public int getLostCount() {
+        int count = 0;
+        for (Survivor survivor : survivors) {
+            if (survivor.isLost()) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /** Survivors not yet rescued and not lost: still waiting, or being carried out. */
+    public int getStillInsideCount() {
+        return survivors.size() - getRescuedCount() - getLostCount();
+    }
+
     /** The active (not downed) rescuer standing at (row, col), or null. */
     public Rescuer getRescuerAt(int row, int col) {
         for (Rescuer rescuer : rescuers) {
@@ -111,8 +119,6 @@ public class GameBoard {
         }
         return null;
     }
-
-    // ----- What the active rescuer can see right now (fog of war) -----
 
     public boolean isVisible(int row, int col) {
         return inBounds(row, col) && visible[row][col];

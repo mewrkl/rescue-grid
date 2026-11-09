@@ -4,19 +4,7 @@ import java.util.HashSet;
 
 import com.badlogic.gdx.InputAdapter;
 
-/**
- * Remembers which keys are being held down right now.
- *
- * libGDX tells us when a key goes down (keyDown) and comes up (keyUp). By
- * keeping the held keys in a HashSet, the game loop can ask "is W held?" every
- * frame, which is what makes hold-to-walk work.
- *
- * wasPressed() is for one-shot keys like E or Tab: it is true only once per
- * press, even if the key is held down.
- *
- * Extends InputAdapter, libGDX's empty "do nothing" InputProcessor: we only
- * override the two methods we need.
- */
+/** Tracks held keys (for hold-to-walk) and new presses (for one-shot keys like E). */
 public class KeyboardInput extends InputAdapter {
 
     private final HashSet<Integer> heldKeys;
@@ -30,7 +18,7 @@ public class KeyboardInput extends InputAdapter {
     @Override
     public boolean keyDown(int keycode) {
         // add() returns false if the key was already held, so a held key only
-        // counts as ONE new press.
+        // counts as one new press.
         if (heldKeys.add(keycode)) {
             newPresses.add(keycode);
         }

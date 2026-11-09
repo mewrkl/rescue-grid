@@ -11,11 +11,8 @@ import rescuegrid.model.rescuers.Rescuer;
 import rescuegrid.model.tiles.Tile;
 
 /**
- * The small map in the corner. It shows the whole building at a few pixels per
- * tile, but only the parts the team has already explored, plus where the exit,
- * the rescuers and any revealed survivors are.
- *
- * Implements Drawable like tiles do; here "size" means pixels per tile.
+ * The corner map: explored tiles, the exit, the rescuers and revealed
+ * survivors. Here size means pixels per tile.
  */
 public class Minimap implements Drawable {
 

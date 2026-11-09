@@ -10,13 +10,12 @@ import rescuegrid.model.GameBoard;
 import rescuegrid.model.Survivor;
 
 /**
- * The Dog Handler's dog follows the scent of survivors through corridors (and
- * through rubble, but not walls), revealing them on the map and minimap even
- * inside the fog.
+ * The dog follows survivors' scent through corridors and rubble (not walls)
+ * and reveals them, even in the fog.
  */
 public class DogHandler extends Rescuer {
 
-    public static final int SCENT_RANGE = 8; // walking steps, tune in testing
+    public static final int SCENT_RANGE = 8; // walking steps
 
     private static final Color COLOR = Painter.rgb(37, 99, 235);
 
@@ -42,10 +41,10 @@ public class DogHandler extends Rescuer {
         }
         startCooldown();
         if (found.isEmpty()) {
-            return "No scent nearby. Try another area";
+            return "No scent nearby";
         }
         if (newlyFound == 0) {
-            return "Only survivors you already know about";
+            return "Nobody new nearby";
         }
         return "The dog found " + newlyFound + (newlyFound == 1 ? " survivor!" : " survivors!");
     }

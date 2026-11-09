@@ -10,14 +10,8 @@ import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.GdxRuntimeException;
 
 /**
- * Loads every image ONCE at startup and hands them out by name.
- *
- * Drop a PNG named after a key into assets/images/ (for example
- * assets/images/floor.png) and the game uses it automatically. If a file is
- * missing, getImage returns null and the game draws a stand-in made of shapes.
- *
- * (Not to be confused with libGDX's own AssetManager class: ours is the one
- * from our proposal, and it only handles our sprites.)
+ * Loads the sprite images at startup and hands them out by name.
+ * A missing image gives null, and the game draws its shape version instead.
  */
 public class AssetManager implements Disposable {
 

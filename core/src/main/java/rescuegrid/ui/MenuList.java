@@ -13,18 +13,8 @@ import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.Align;
 
 /**
- * A game-style menu: a centred column of options, one of which is always
- * selected. The selected option is bigger, in the highlight colour, with an
- * arrow on each side:
- *
- *              >  START  <
- *               HOW TO PLAY
- *                  QUIT
- *
- * Keyboard: Up/Down (or W/S) moves, Enter or Space chooses, Esc goes back.
- * Mouse: hovering selects, clicking chooses.
- *
- * Extends Scene2D's Table: each option is one row.
+ * A centred column of menu options with one selected. Up/Down or W/S move,
+ * Enter or Space choose, Esc goes back; the mouse works too.
  */
 public class MenuList extends Table {
 

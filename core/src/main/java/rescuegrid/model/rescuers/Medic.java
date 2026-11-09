@@ -14,7 +14,7 @@ import rescuegrid.model.tiles.Tile;
  */
 public class Medic extends Rescuer {
 
-    public static final int HEAL_AMOUNT = 8; // world ticks of condition, tune in testing
+    public static final int HEAL_AMOUNT = 8; // world ticks of condition
 
     private static final Color COLOR = Painter.rgb(220, 38, 38);
 
@@ -35,7 +35,7 @@ public class Medic extends Rescuer {
             }
         }
         if (patient == null) {
-            throw new InvalidMoveException("No survivor to treat. Face one or carry one");
+            throw new InvalidMoveException("Face or carry a survivor to treat");
         }
         patient.heal(HEAL_AMOUNT);
         startCooldown();

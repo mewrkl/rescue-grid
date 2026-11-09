@@ -31,13 +31,8 @@ import rescuegrid.model.rescuers.Rescuer;
 import rescuegrid.model.tiles.Tile;
 
 /**
- * The game screen: runs the game loop, reads the keyboard, and draws the part
- * of the building the camera is looking at, with the HUD on the right.
- *
- * THE GAME LOOP: libGDX calls render(delta) about 60 times a second, where
- * delta is the seconds since the last frame. Each time, update() moves the game
- * forward by delta, then the draw methods paint the new picture. Everything runs
- * on one thread, so we never have to think about thread safety.
+ * The game screen. libGDX calls render(delta) about 60 times a second;
+ * update() moves the game forward by delta and the draw methods paint it.
  */
 public class GamePanel extends BaseScreen {
 
@@ -64,6 +59,7 @@ public class GamePanel extends BaseScreen {
     private final SoundManager sounds;
     private final Painter painter;
     private final HudPanel hud;
+    private final Toast toast;
     private final Table pauseCard;
     private final Camera camera;
     private final OrthographicCamera overlayCamera; // for things that never scroll (the minimap)
@@ -86,7 +82,8 @@ public class GamePanel extends BaseScreen {
         this.assets = game.getAssets();
         this.sounds = game.getSounds();
         this.painter = game.getPainter();
-        this.hud = new HudPanel(style);
+        this.hud = new HudPanel(style, this);
+        this.toast = new Toast(style);
         this.pauseCard = buildPauseCard();
         this.camera = new Camera(VIEW_ROWS, VIEW_COLS, TILE_SIZE);
         this.overlayCamera = new OrthographicCamera();
@@ -98,9 +95,11 @@ public class GamePanel extends BaseScreen {
         this.shakeRandom = new Random();
         this.state = GameState.MENU;
 
-        // Left: the map area (the pause card floats in its middle). Right: a 1 px line and the HUD.
+        // Left: the map area, with the pause card in the middle and messages near the bottom.
+        // Right: a 1 px line and the HUD.
         Table mapArea = new Table();
-        mapArea.add(pauseCard);
+        mapArea.add(pauseCard).expand().row();
+        mapArea.add(toast).padBottom(32);
         root.add(mapArea).width(VIEW_WIDTH).expandY().fillY();
         root.add(new Image(style.solid(UiStyle.BORDER))).width(1).fillY();
         root.add(hud).width(HudPanel.WIDTH - 1).fillY();
@@ -124,7 +123,7 @@ public class GamePanel extends BaseScreen {
     /** Loads a level and starts playing. Throws IllegalArgumentException for a broken level. */
     public void startLevel(int levelNumber) {
         level = LevelData.forLevel(levelNumber);
-        board = loader.load(level);
+        board = loader.load(level, new Random()); // new Random(): survivors in different spots each time
         turns = new TurnManager(board, new HazardManager(level.getSeed()), level);
         activeRescuer = board.getRescuers().get(0);
         minimap.setBoard(board);
@@ -134,7 +133,7 @@ public class GamePanel extends BaseScreen {
         pauseCard.setVisible(false);
         movement.computeSight(board, activeRescuer);
         camera.follow(activeRescuer.getRow(), activeRescuer.getCol(), board.getRows(), board.getCols());
-        hud.showMessage("Find the survivors and bring them to the EXIT");
+        toast.show("Save " + level.getTarget() + " of the " + level.getSurvivorCount() + " survivors");
         hud.refresh(board, activeRescuer, turns, level);
 
         sounds.loopMusic("gameplay");
@@ -155,8 +154,6 @@ public class GamePanel extends BaseScreen {
         }
     }
 
-    // ----- The game loop -----
-
     @Override
     public void render(float delta) {
         if (board == null) {
@@ -170,6 +167,7 @@ public class GamePanel extends BaseScreen {
         drawWorld();
         drawOverlay();
         drawStage(delta);
+        drawIcons();
     }
 
     /** Moves the game forward by "seconds". */
@@ -209,8 +207,6 @@ public class GamePanel extends BaseScreen {
         }
     }
 
-    // ----- Keyboard -----
-
     /** One-shot keys: switching rescuer and the special action. */
     private void handleActionKeys() {
         if (keys.wasPressed(Input.Keys.NUM_1)) {
@@ -223,16 +219,15 @@ public class GamePanel extends BaseScreen {
             switchToNext();
         }
 
-        // E is the ability key, as in most PC games (Q and E are the usual ability keys).
         if (keys.wasPressed(Input.Keys.E)) {
             try {
-                // Polymorphism: Java runs the Medic's, Engineer's or Dog Handler's version.
+                // Runs the Medic's, Engineer's or Dog Handler's own version.
                 String result = activeRescuer.specialAction(board);
                 sounds.play(activeRescuer.getSpecialSound());
-                hud.showMessage(result);
+                toast.show(result);
             } catch (InvalidMoveException e) {
                 sounds.play("denied");
-                hud.showMessage(e.getMessage());
+                toast.show(e.getMessage());
             }
         }
     }
@@ -270,7 +265,10 @@ public class GamePanel extends BaseScreen {
         return null;
     }
 
-    /** After every step: deliver at the exit, or pick up a survivor on this tile. */
+    /**
+     * After every step: at the exit, deliver a survivor or (hands free, goal
+     * reached) leave the building. Anywhere else, pick up a survivor on this tile.
+     */
     private void afterStep() {
         int row = activeRescuer.getRow();
         int col = activeRescuer.getCol();
@@ -278,7 +276,16 @@ public class GamePanel extends BaseScreen {
         if (here.isExit() && activeRescuer.isCarrying()) {
             activeRescuer.deliverSurvivor();
             sounds.play("rescued");
-            hud.showMessage("Survivor rescued! " + board.getRescuedCount() + " of " + level.getTarget());
+            if (turns.isTargetReached() && board.getStillInsideCount() > 0) {
+                toast.show("Step off and back on to leave");
+            }
+            return;
+        }
+        if (here.isExit()) {
+            // Hands free on the exit: leave if enough survivors are out (update() then ends the level).
+            if (!turns.evacuate()) {
+                toast.show("Save " + turns.getStillNeeded() + " more before you leave");
+            }
             return;
         }
         if (!activeRescuer.isCarrying()) {
@@ -287,7 +294,6 @@ public class GamePanel extends BaseScreen {
                 survivor.reveal();
                 activeRescuer.pickUp(survivor);
                 sounds.play("pickup");
-                hud.showMessage("Picked up a survivor. Carry them to the EXIT");
             }
         }
     }
@@ -299,7 +305,7 @@ public class GamePanel extends BaseScreen {
         }
         if (chosen.isDowned()) {
             sounds.play("denied");
-            hud.showMessage(chosen.getName() + " is down");
+            toast.show(chosen.getName() + " is down");
             return;
         }
         setActive(chosen);
@@ -346,8 +352,6 @@ public class GamePanel extends BaseScreen {
         }
     }
 
-    // ----- Events from the world tick -----
-
     /** Turns what happened in the world tick into sounds, messages and screen shake. */
     private void handleEvents(List<GameEvent> events) {
         for (GameEvent event : events) {
@@ -376,7 +380,7 @@ public class GamePanel extends BaseScreen {
                     break;
             }
             if (!event.getMessage().isEmpty()) {
-                hud.showMessage(event.getMessage());
+                toast.show(event.getMessage());
             }
         }
     }
@@ -394,8 +398,6 @@ public class GamePanel extends BaseScreen {
         sounds.play(success ? "success" : "failure");
         game.showResult(success, level, board, turns.getElapsedSeconds());
     }
-
-    // ----- Drawing -----
 
     /** The building, seen through the camera. Shaken during aftershocks. */
     private void drawWorld() {
@@ -433,7 +435,7 @@ public class GamePanel extends BaseScreen {
         int lastCol = Math.min(camera.getFirstCol() + VIEW_COLS + 1, board.getCols());
         for (int row = camera.getFirstRow(); row < lastRow; row++) {
             for (int col = camera.getFirstCol(); col < lastCol; col++) {
-                // Polymorphism: every tile draws itself, we never check what kind it is.
+                // Each tile draws itself.
                 board.getTile(row, col).draw(painter, camera.toMapX(col), camera.toMapY(row), TILE_SIZE, assets);
             }
         }

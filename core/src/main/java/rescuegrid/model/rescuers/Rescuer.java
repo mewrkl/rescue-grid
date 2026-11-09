@@ -13,19 +13,13 @@ import rescuegrid.model.Survivor;
 import rescuegrid.model.tiles.Tile;
 
 /**
- * A member of the rescue team. Abstract: the game only ever creates a Medic,
- * an Engineer or a DogHandler.
- *
- * Encapsulation: health, the special cooldown and the move timer are private.
- * They only change through takeDamage(), startCooldown() and tick(), so no
- * other class can ever set an impossible value like health = -3.
- *
- * Polymorphism: the game calls specialAction(board) on whichever rescuer is
- * active, and Java runs that subclass's own version.
+ * A member of the rescue team: a Medic, Engineer or DogHandler.
+ * Health, cooldown and the move timer are private and only change through
+ * takeDamage(), startCooldown() and tick(). Each subclass has its own specialAction().
  */
 public abstract class Rescuer implements Drawable {
 
-    public static final int MAX_HEALTH = 5;             // tune in testing
+    public static final int MAX_HEALTH = 5;
     public static final double STEP_DELAY = 0.15;       // seconds per tile
     public static final double CARRY_STEP_DELAY = 0.30; // seconds per tile while carrying
 
@@ -61,8 +55,6 @@ public abstract class Rescuer implements Drawable {
         this.hurtFlash = 0;
     }
 
-    // ----- Each subclass must provide these -----
-
     /**
      * The rescuer's special ability. Returns a short message for the HUD on
      * success, and throws InvalidMoveException if it can't be used right now.
@@ -84,8 +76,6 @@ public abstract class Rescuer implements Drawable {
 
     /** Draws the small symbol that shows who this is (red cross, hard hat, paw). */
     protected abstract void drawRoleIcon(Painter painter, float x, float y, float size);
-
-    // ----- Time -----
 
     /** Called every frame with the seconds since the last frame. */
     public void tick(double seconds) {
@@ -112,8 +102,6 @@ public abstract class Rescuer implements Drawable {
         return isCarrying() ? CARRY_STEP_DELAY : STEP_DELAY;
     }
 
-    // ----- Movement -----
-
     /** Moves to (newRow, newCol). The caller has already checked the step is legal. */
     public void moveTo(int newRow, int newCol) {
         prevRow = row;
@@ -127,7 +115,7 @@ public abstract class Rescuer implements Drawable {
         }
     }
 
-    /** Overloaded version of moveTo: same name, different parameters. */
+    /** Moves onto the given tile. */
     public void moveTo(Tile target) {
         moveTo(target.getRow(), target.getCol());
     }
@@ -146,9 +134,8 @@ public abstract class Rescuer implements Drawable {
     }
 
     /**
-     * Where to DRAW the rescuer. During a step this is part-way between the old
-     * and new tile, so movement slides smoothly instead of jumping.
-     * Example: halfway through a step from row 5 to row 6, this returns 5.5.
+     * Where to draw the rescuer: part-way between tiles during a step, so
+     * movement slides (halfway from row 5 to row 6 gives 5.5).
      */
     public double getDrawRow() {
         return prevRow + (row - prevRow) * stepProgress();
@@ -166,8 +153,6 @@ public abstract class Rescuer implements Drawable {
         return 1.0 - moveTimer / stepDuration;
     }
 
-    // ----- Health -----
-
     public void takeDamage(int amount) {
         health = Math.max(0, health - amount);
         hurtFlash = HURT_FLASH_SECONDS;
@@ -176,8 +161,6 @@ public abstract class Rescuer implements Drawable {
     public boolean isDowned() {
         return health <= 0;
     }
-
-    // ----- Carrying -----
 
     public void pickUp(Survivor survivor) {
         if (carriedSurvivor != null) {
@@ -212,8 +195,6 @@ public abstract class Rescuer implements Drawable {
         return carriedSurvivor != null;
     }
 
-    // ----- Getters -----
-
     public int getRow() {
         return row;
     }
@@ -233,8 +214,6 @@ public abstract class Rescuer implements Drawable {
     public double getSpecialCooldown() {
         return specialCooldown;
     }
-
-    // ----- Drawing -----
 
     /** Draws the rescuer image (or placeholder), then the carry badge and hurt flash. */
     @Override

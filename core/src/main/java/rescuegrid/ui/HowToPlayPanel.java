@@ -3,6 +3,7 @@ package rescuegrid.ui;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
+import com.badlogic.gdx.utils.Align;
 
 import rescuegrid.model.Drawable;
 import rescuegrid.model.Survivor;
@@ -15,16 +16,8 @@ import rescuegrid.model.tiles.Fire;
 import rescuegrid.model.tiles.Rubble;
 
 /**
- * Explains the game in three columns instead of paragraphs, so a player can
- * take it in at a glance:
- *
- *   CONTROLS            YOUR TEAM                 THE BUILDING
- *   [W][A][S][D] Walk   (Medic) Treat ...         (Exit) Carry survivors here
- *   [1][2][3] Switch    (Engineer) Clear ...      (Fire) Spreads and burns
- *   ...                 ...                       ...
- *
- * Keys are drawn as keycaps, and the team and building columns use the real
- * game art (through IconSlot), so what you learn here is what you see in play.
+ * How to Play: controls, the team and the building in three columns,
+ * drawn with the real game art.
  */
 public class HowToPlayPanel extends BaseScreen {
 
@@ -36,7 +29,8 @@ public class HowToPlayPanel extends BaseScreen {
         super(game);
 
         Label goal = style.label("Find the survivors hidden in the dark and carry them to the EXIT "
-                + "before they run out of time.", UiStyle.TEXT);
+                + "before they run out of time.\nSaved enough? Step on the EXIT to leave.", UiStyle.TEXT);
+        goal.setAlignment(Align.center);
 
         Table columns = new Table();
         columns.top();
@@ -54,8 +48,6 @@ public class HowToPlayPanel extends BaseScreen {
         root.add(menu).padTop(48).row();
         root.add(hint("Enter or Esc to go back")).padTop(16).row();
     }
-
-    // ----- Column 1: the keys -----
 
     private Table controlsColumn() {
         Table column = heading("CONTROLS");
@@ -80,8 +72,6 @@ public class HowToPlayPanel extends BaseScreen {
         column.add(row).width(COLUMN_WIDTH).left().padTop(12).row();
     }
 
-    // ----- Column 2: the team -----
-
     private Table teamColumn() {
         Table column = heading("YOUR TEAM");
         iconRow(column, new Medic(0, 0), "Medic", "Treats a survivor to give them more time.");
@@ -89,8 +79,6 @@ public class HowToPlayPanel extends BaseScreen {
         iconRow(column, new DogHandler(0, 0), "Dog Handler", "The dog sniffs out hidden survivors nearby.");
         return column;
     }
-
-    // ----- Column 3: the building -----
 
     private Table buildingColumn() {
         Table column = heading("THE BUILDING");
@@ -102,8 +90,6 @@ public class HowToPlayPanel extends BaseScreen {
         iconRow(column, new Rubble(0, 0), "Rubble", "Blocks the way until cleared.");
         return column;
     }
-
-    // ----- Shared pieces -----
 
     private Table heading(String text) {
         Table column = new Table();

@@ -8,12 +8,8 @@ import rescuegrid.graphics.Painter;
 import rescuegrid.model.GameBoard;
 
 /**
- * Damaged floor that is still walkable, but ALWAYS collapses into rubble on the
- * next aftershock. Level designers put it across shortcuts on purpose, so a
- * quake visibly cuts off a route the player was using.
- *
- * Extends Floor (two levels of inheritance: Tile -> Floor -> CrackedFloor), so it
- * is walkable without repeating that code.
+ * Walkable floor that collapses into rubble on every aftershock. Levels put it
+ * across shortcuts so a quake cuts off a route.
  */
 public class CrackedFloor extends Floor {
 
@@ -24,11 +20,7 @@ public class CrackedFloor extends Floor {
         super(row, col);
     }
 
-    /**
-     * Cracked floor does not burn. Otherwise fire could turn the shortcut into
-     * burnt floor before the quake, and the designed "path collapses" moment
-     * would never happen.
-     */
+    /** Doesn't burn, so fire can't remove the shortcut before the quake does. */
     @Override
     public boolean isFlammable() {
         return false;

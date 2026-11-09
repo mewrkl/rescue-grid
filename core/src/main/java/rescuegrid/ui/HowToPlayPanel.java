@@ -86,7 +86,7 @@ public class HowToPlayPanel extends BaseScreen {
                 "Walk onto them to pick them up.");
         iconRow(column, new Exit(0, 0), "Exit", "Carry survivors here to save them.");
         iconRow(column, new Fire(0, 0), "Fire", "Spreads and burns anyone next to it.");
-        iconRow(column, new CrackedFloor(0, 0), "Cracked floor", "Turns into rubble in an aftershock.");
+        iconRow(column, new CrackedFloor(0, 0), "Cracked floor", "Collapses in an aftershock. Tiles about to fall flash orange.");
         iconRow(column, new Rubble(0, 0), "Rubble", "Blocks the way until cleared.");
         return column;
     }

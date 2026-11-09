@@ -50,6 +50,7 @@ public class TurnManager {
         }
         if (!warningGiven && getSecondsUntilAftershock() <= WARNING_SECONDS) {
             warningGiven = true;
+            hazards.planCollapses(board);
             events.add(new GameEvent(GameEvent.Type.AFTERSHOCK_WARNING, ""));
         }
     }
@@ -132,6 +133,16 @@ public class TurnManager {
         }
         evacuated = true;
         return true;
+    }
+
+    /** True from the warning until the aftershock hits. */
+    public boolean isAftershockComing() {
+        return warningGiven;
+    }
+
+    /** True if the coming aftershock will collapse the tile at (row, col). */
+    public boolean willCollapse(int row, int col) {
+        return hazards.willCollapse(board, row, col);
     }
 
     /** Hands over everything that happened since the last call, and forgets it. */

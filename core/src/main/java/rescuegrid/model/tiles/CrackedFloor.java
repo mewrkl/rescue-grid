@@ -32,6 +32,11 @@ public class CrackedFloor extends Floor {
         return false;
     }
 
+    @Override
+    public boolean collapsesInAftershock() {
+        return true;
+    }
+
     /** The aftershock turns this tile into rubble. */
     @Override
     public void onAftershock(GameBoard board) {

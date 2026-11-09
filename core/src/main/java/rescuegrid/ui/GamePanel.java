@@ -54,6 +54,9 @@ public class GamePanel extends BaseScreen {
     private static final Color REMEMBERED = Painter.rgba(0, 0, 0, 150);
     private static final Color FACED_TILE = Painter.rgba(255, 255, 255, 150);
     private static final Color PAUSE_SCRIM = Painter.rgba(0, 0, 0, 170);
+    private static final double WARNING_PULSES_PER_SECOND = 1.5;
+    private static final float EDGE_GLOW_WIDTH = 48;
+    private static final float EDGE_GLOW_ALPHA = 0.22f;
 
     private final AssetManager assets;
     private final SoundManager sounds;
@@ -411,6 +414,7 @@ public class GamePanel extends BaseScreen {
         HdpiUtils.glViewport(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
         painter.begin(camera.getProjection(shakeX, shakeY));
         drawTiles();
+        drawCollapseWarning();
         drawFog();
         drawSurvivors();
         drawFacedTile();
@@ -423,6 +427,7 @@ public class GamePanel extends BaseScreen {
         painter.begin(overlayCamera.combined);
         float width = board.getCols() * MINIMAP_SCALE;
         minimap.draw(painter, VIEW_WIDTH - width - MINIMAP_MARGIN, MINIMAP_MARGIN, MINIMAP_SCALE, assets);
+        drawEdgeGlow();
         if (state == GameState.PAUSED) {
             painter.fillRect(PAUSE_SCRIM, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
         }
@@ -439,6 +444,48 @@ public class GamePanel extends BaseScreen {
                 board.getTile(row, col).draw(painter, camera.toMapX(col), camera.toMapY(row), TILE_SIZE, assets);
             }
         }
+    }
+
+    /** 0 to 1 and back, WARNING_PULSES_PER_SECOND times a second. Stops while paused. */
+    private float warningPulse() {
+        double cycles = turns.getElapsedSeconds() * WARNING_PULSES_PER_SECOND;
+        return (float) (0.5 - 0.5 * Math.cos(cycles * 2 * Math.PI));
+    }
+
+    /** Before an aftershock, the tiles that are about to collapse pulse orange. */
+    private void drawCollapseWarning() {
+        if (!turns.isAftershockComing()) {
+            return;
+        }
+        float pulse = warningPulse();
+        Color fill = new Color(UiStyle.WARNING.r, UiStyle.WARNING.g, UiStyle.WARNING.b, 0.15f + 0.30f * pulse);
+        Color edge = new Color(UiStyle.WARNING.r, UiStyle.WARNING.g, UiStyle.WARNING.b, 0.5f + 0.5f * pulse);
+        int lastRow = Math.min(camera.getFirstRow() + VIEW_ROWS + 1, board.getRows());
+        int lastCol = Math.min(camera.getFirstCol() + VIEW_COLS + 1, board.getCols());
+        for (int row = camera.getFirstRow(); row < lastRow; row++) {
+            for (int col = camera.getFirstCol(); col < lastCol; col++) {
+                if (turns.willCollapse(row, col)) {
+                    float x = camera.toMapX(col);
+                    float y = camera.toMapY(row);
+                    painter.fillRect(fill, x, y, TILE_SIZE, TILE_SIZE);
+                    painter.outlineRect(edge, x, y, TILE_SIZE, TILE_SIZE, 2);
+                }
+            }
+        }
+    }
+
+    /** A faint orange glow at the edges of the map that pulses until the aftershock. */
+    private void drawEdgeGlow() {
+        if (!turns.isAftershockComing()) {
+            return;
+        }
+        Color glow = new Color(UiStyle.WARNING.r, UiStyle.WARNING.g, UiStyle.WARNING.b, EDGE_GLOW_ALPHA * warningPulse());
+        Color clear = new Color(UiStyle.WARNING.r, UiStyle.WARNING.g, UiStyle.WARNING.b, 0);
+        float w = EDGE_GLOW_WIDTH;
+        painter.gradientRect(0, 0, VIEW_WIDTH, w, glow, glow, clear, clear);                              // top
+        painter.gradientRect(0, VIEW_HEIGHT - w, VIEW_WIDTH, w, clear, clear, glow, glow);                // bottom
+        painter.gradientRect(0, 0, w, VIEW_HEIGHT, glow, clear, clear, glow);                             // left
+        painter.gradientRect(VIEW_WIDTH - w, 0, w, VIEW_HEIGHT, clear, glow, glow, clear);                // right
     }
 
     /** Black over unexplored tiles, a dark veil over tiles you remember but can't see now. */

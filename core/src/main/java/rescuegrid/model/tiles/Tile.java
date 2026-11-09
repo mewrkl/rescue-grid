@@ -59,6 +59,11 @@ public abstract class Tile implements Drawable {
         return false;
     }
 
+    /** Will the next aftershock collapse this tile no matter what? Only CrackedFloor says yes. */
+    public boolean collapsesInAftershock() {
+        return false;
+    }
+
     /** Called on every tile when an aftershock hits. CrackedFloor reacts. */
     public void onAftershock(GameBoard board) {
         // Most tiles do nothing.

@@ -105,6 +105,13 @@ public class Painter implements Disposable {
         shapes.rect(x, y, width, height);
     }
 
+    /** A rectangle whose colour blends between its corners: (x, y), (x + w, y), (x + w, y + h), (x, y + h). */
+    public void gradientRect(float x, float y, float width, float height,
+                             Color corner1, Color corner2, Color corner3, Color corner4) {
+        useShapes();
+        shapes.rect(x, y, width, height, corner1, corner2, corner3, corner4);
+    }
+
     /** A rectangle border drawn inside the box (x, y, width, height). */
     public void outlineRect(Color color, float x, float y, float width, float height, float thickness) {
         fillRect(color, x, y, width, thickness);                                    // top

@@ -4,6 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -102,5 +105,54 @@ class TurnManagerTest {
         assertTrue(turns.evacuate());
         assertTrue(turns.isMissionOver());
         assertTrue(turns.isSuccess());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 2, 3})
+    void theWarningShowsExactlyTheTilesThatCollapse(int levelNumber) {
+        LevelData level = LevelData.forLevel(levelNumber);
+        GameBoard board = new LevelLoader().load(level);
+        TurnManager turns = new TurnManager(board, new HazardManager(level.getSeed()), level);
+        while (!turns.isAftershockComing()) {
+            turns.update(FRAME);
+        }
+        assertTrue(countRandomCollapses(board, turns) > 0, "some floor is marked as well as cracked floor");
+        assertTrue(countRandomCollapses(board, turns) <= HazardManager.RANDOM_COLLAPSES);
+
+        // What the player sees on the last frame before the aftershock is what collapses.
+        List<int[]> marked = new ArrayList<>();
+        while (turns.isAftershockComing()) {
+            marked = markedTiles(board, turns);
+            turns.update(FRAME);
+        }
+        assertFalse(marked.isEmpty());
+        for (int[] tile : marked) {
+            // Fire can still spread onto a marked tile in the same tick, just before the quake.
+            boolean collapsed = board.getTile(tile[0], tile[1]).isClearable();
+            boolean burning = board.getTile(tile[0], tile[1]).isBurning();
+            assertTrue(collapsed || burning, "marked tile (" + tile[0] + "," + tile[1] + ") became rubble");
+        }
+    }
+
+    private static List<int[]> markedTiles(GameBoard board, TurnManager turns) {
+        List<int[]> marked = new ArrayList<>();
+        for (int row = 0; row < board.getRows(); row++) {
+            for (int col = 0; col < board.getCols(); col++) {
+                if (turns.willCollapse(row, col)) {
+                    marked.add(new int[] {row, col});
+                }
+            }
+        }
+        return marked;
+    }
+
+    private static int countRandomCollapses(GameBoard board, TurnManager turns) {
+        int count = 0;
+        for (int[] tile : markedTiles(board, turns)) {
+            if (!board.getTile(tile[0], tile[1]).collapsesInAftershock()) {
+                count++;
+            }
+        }
+        return count;
     }
 }

@@ -156,10 +156,14 @@ You control **one rescuer at a time**. Press 1, 2, 3 or Tab to switch, and the c
 ### 4.5 Aftershocks
 
 - Each level has an aftershock countdown measured in world ticks: Level 1 every 15 ticks (45 s), Level 2 every 12 (36 s), Level 3 every 9 (27 s) *(tune)*.
-- The HUD shows "Next aftershock: Xs". At 5 s left, the screen shakes slightly and plays a warning rumble.
+- The HUD shows a bar and the seconds left. At 5 s left (the warning):
+  - the bar and number turn orange, the screen shakes slightly, and a warning rumble plays;
+  - the random floor tiles that will collapse are chosen now, and every tile about to collapse (cracked floor and the chosen ones) pulses orange on the map, the way Into the Breach marks tiles before they are hit;
+  - a faint orange glow pulses at the edges of the map.
+  Orange is used for danger that is coming; red stays for damage. Added 2026-11-09 after playtesting.
 - When an aftershock happens:
   1. **Every CrackedFloor tile becomes Rubble.** This is the designed path-blocker.
-  2. Up to 3 random Floor tiles become Rubble *(tune)*. Skip tiles that have a rescuer or survivor on them, or that are next to the Exit.
+  2. The up to 3 Floor tiles chosen at the warning become Rubble *(tune)*. They are chosen from tiles with no rescuer or survivor on them and not next to the Exit. A chosen tile that caught fire in the meantime stays fire, and one where a survivor was put down doesn't collapse.
   3. Every active rescuer takes 1 damage.
   4. The countdown resets.
 - A cracked tile with a rescuer standing on it still collapses. The rescuer is pushed to a free neighbouring walkable tile, or takes 1 extra damage if there is none.

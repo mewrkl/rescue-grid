@@ -25,9 +25,11 @@ public class HazardManager {
     public static final int RANDOM_COLLAPSES = 3;
 
     private final Random random;
+    private final List<Tile> plannedCollapses;
 
     public HazardManager(long seed) {
         this.random = new Random(seed);
+        this.plannedCollapses = new ArrayList<>();
     }
 
     /** Step 1 of the tick: every active rescuer next to fire loses 1 health. */
@@ -83,14 +85,11 @@ public class HazardManager {
         }
     }
 
-    /** Step 5: the aftershock. */
-    public void triggerAftershock(GameBoard board, List<GameEvent> events) {
-        // 1. Every tile hears about the aftershock. Only CrackedFloor reacts (it becomes Rubble).
-        for (Tile tile : allTiles(board)) {
-            tile.onAftershock(board);
-        }
-
-        // 2. A few random floor tiles collapse too.
+    /**
+     * Chooses the random floor tiles the next aftershock will collapse. Called at
+     * the warning, so the game can show the player which tiles are about to fall.
+     */
+    public void planCollapses(GameBoard board) {
         List<Tile> candidates = new ArrayList<>();
         for (Tile tile : allTiles(board)) {
             int row = tile.getRow();
@@ -101,10 +100,43 @@ public class HazardManager {
             }
         }
         Collections.shuffle(candidates, random);
+        plannedCollapses.clear();
         for (int i = 0; i < RANDOM_COLLAPSES && i < candidates.size(); i++) {
-            Tile tile = candidates.get(i);
-            board.replaceTile(tile.getRow(), tile.getCol(), new Rubble(tile.getRow(), tile.getCol()));
+            plannedCollapses.add(candidates.get(i));
         }
+    }
+
+    /** True if the next aftershock will collapse the tile at (row, col). */
+    public boolean willCollapse(GameBoard board, int row, int col) {
+        Tile tile = board.getTile(row, col);
+        return tile != null && (tile.collapsesInAftershock() || isStillPlanned(board, tile));
+    }
+
+    /** A planned tile only falls if nothing replaced it meanwhile (fire, for example). */
+    private boolean isStillPlanned(GameBoard board, Tile tile) {
+        return plannedCollapses.contains(tile) && board.getTile(tile.getRow(), tile.getCol()) == tile;
+    }
+
+    /** Step 5: the aftershock. */
+    public void triggerAftershock(GameBoard board, List<GameEvent> events) {
+        if (plannedCollapses.isEmpty()) {
+            planCollapses(board);
+        }
+
+        // 1. Every tile hears about the aftershock. Only CrackedFloor reacts (it becomes Rubble).
+        for (Tile tile : allTiles(board)) {
+            tile.onAftershock(board);
+        }
+
+        // 2. The planned floor tiles collapse too, unless a survivor has been put down there.
+        for (Tile tile : plannedCollapses) {
+            int row = tile.getRow();
+            int col = tile.getCol();
+            if (isStillPlanned(board, tile) && board.getSurvivorAt(row, col) == null) {
+                board.replaceTile(row, col, new Rubble(row, col));
+            }
+        }
+        plannedCollapses.clear();
 
         // 3. Anyone standing on a tile that just collapsed is pushed to a free neighbour.
         pushPeopleOffRubble(board, events);
@@ -115,7 +147,7 @@ public class HazardManager {
                 hurt(rescuer, 1, "", events);
             }
         }
-        events.add(new GameEvent(GameEvent.Type.AFTERSHOCK, "The cracked floor collapsed"));
+        events.add(new GameEvent(GameEvent.Type.AFTERSHOCK, ""));
     }
 
     /** Damages a rescuer. If that downs them, they drop whoever they were carrying. */

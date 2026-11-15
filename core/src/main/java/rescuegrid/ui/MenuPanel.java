@@ -38,7 +38,8 @@ public class MenuPanel extends BaseScreen {
         team.add(icon(new DogHandler(0, 0), 64));
 
         MenuList menu = createMenu();
-        menu.addOption("START GAME", () -> game.startLevel(1));
+        menu.addOption("START GAME", () -> game.startLevel(LevelData.TUTORIAL)); // training first
+        menu.addOption("SKIP TRAINING", () -> game.startLevel(1));
         menu.addOption("HOW TO PLAY", game::showHowToPlay);
         menu.addOption("QUIT", () -> Gdx.app.exit());
 

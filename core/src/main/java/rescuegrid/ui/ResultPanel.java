@@ -52,9 +52,11 @@ public class ResultPanel extends BaseScreen {
 
     public void showResult(boolean success, LevelData level, GameBoard board, double seconds) {
         boolean finishedGame = success && !level.hasNextLevel();
+        String complete = level.isTutorial() ? "TRAINING COMPLETE" : "MISSION COMPLETE";
         titleLabel.setText(finishedGame ? "ALL LEVELS CLEARED"
-                : success ? "MISSION COMPLETE" : "MISSION FAILED");
-        summaryLabel.setText("Level " + level.getNumber() + ": rescued " + board.getRescuedCount()
+                : success ? complete : "MISSION FAILED");
+        String name = level.isTutorial() ? "Training" : "Level " + level.getNumber();
+        summaryLabel.setText(name + ": rescued " + board.getRescuedCount()
                 + " of " + board.getSurvivors().size() + " survivors (needed " + level.getTarget() + ")");
 
         pointLabels[0].setText(String.valueOf(scoreKeeper.rescuePoints(board)));
@@ -66,7 +68,8 @@ public class ResultPanel extends BaseScreen {
         // The first option is what the player most likely wants next.
         menu.clearOptions();
         if (success && level.hasNextLevel()) {
-            menu.addOption("NEXT LEVEL", () -> game.startLevel(level.getNumber() + 1));
+            menu.addOption(level.isTutorial() ? "START LEVEL 1" : "NEXT LEVEL",
+                    () -> game.startLevel(level.getNumber() + 1));
         }
         menu.addOption(success ? "PLAY AGAIN" : "TRY AGAIN", () -> game.startLevel(level.getNumber()));
         menu.addOption("MAIN MENU", game::showMenu);

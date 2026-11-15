@@ -3,6 +3,7 @@ package rescuegrid.ui;
 import java.util.List;
 
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.scenes.scene2d.ui.Cell;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
@@ -26,6 +27,7 @@ class ObjectivePanel extends Table {
     private final Image[] boxes;
     private final Label[] lines;
     private final Label nextStep;
+    private final Cell<Label> nextCell;
 
     ObjectivePanel(UiStyle style) {
         setBackground(style.smallCard());
@@ -46,10 +48,11 @@ class ObjectivePanel extends Table {
         }
         nextStep = style.label(" ", UiStyle.SELECTED);
         nextStep.setWrap(true);
-        add(nextStep).width(WIDTH).padTop(8).row();
+        nextCell = add(nextStep).width(WIDTH).padTop(8);
+        row();
     }
 
-    /** Done steps get a filled box and dim text; the next step is in the accent colour. */
+    /** Done steps get a filled box and dim text; the next step (if any) is in the accent colour. */
     void refresh(List<Objective> objectives, String next) {
         for (int i = 0; i < LINES && i < objectives.size(); i++) {
             Objective objective = objectives.get(i);
@@ -57,6 +60,11 @@ class ObjectivePanel extends Table {
             lines[i].setText(objective.getText());
             lines[i].setColor(objective.isDone() ? UiStyle.TEXT_SECONDARY : UiStyle.TEXT);
         }
-        nextStep.setText("> " + next);
+        if (next == null) {
+            nextCell.setActor(null).padTop(0); // no gap where the line would be
+        } else {
+            nextStep.setText("> " + next);
+            nextCell.setActor(nextStep).padTop(8);
+        }
     }
 }

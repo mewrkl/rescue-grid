@@ -31,7 +31,7 @@ class LevelBalanceTest {
     private static final double FIRE_FREE_SECONDS = 40;
 
     @ParameterizedTest
-    @ValueSource(ints = {1, 2, 3})
+    @ValueSource(ints = {0, 1, 2, 3})
     void everyPickOfSurvivorSpotsCanReachTheTargetInTime(int levelNumber) {
         LevelData level = LevelData.forLevel(levelNumber);
         String[] rows = new LevelLoader().readLines(level.getFileName());
@@ -80,7 +80,7 @@ class LevelBalanceTest {
      * with nobody moving shows exactly when fire reaches each spot.
      */
     @ParameterizedTest
-    @ValueSource(ints = {1, 2, 3})
+    @ValueSource(ints = {0, 1, 2, 3})
     void fireReachesNoSurvivorSpotInTheFirstFortySeconds(int levelNumber) {
         LevelData level = LevelData.forLevel(levelNumber);
         LevelLoader loader = new LevelLoader();

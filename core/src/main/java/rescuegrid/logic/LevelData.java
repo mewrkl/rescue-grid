@@ -7,6 +7,7 @@ package rescuegrid.logic;
 public class LevelData {
 
     public static final int LEVEL_COUNT = 3;
+    public static final int TUTORIAL = 0; // the training level, played before Level 1
 
     private final int number;
     private final String fileName;
@@ -37,6 +38,8 @@ public class LevelData {
      */
     public static LevelData forLevel(int number) {
         switch (number) {
+            case TUTORIAL: // lots of time, slow aftershocks, fire that barely spreads
+                return new LevelData(0, "/levels/tutorial.txt", 4, 4, 20, 60, "", 0.08, 7L);
             case 1:
                 return new LevelData(1, "/levels/level1.txt", 4, 3, 15, 20, "ms", 0.15, 1001L);
             case 2:
@@ -54,7 +57,11 @@ public class LevelData {
 
     /** What the HUD calls this level. */
     public String getTitle() {
-        return "LEVEL " + number;
+        return isTutorial() ? "TRAINING" : "LEVEL " + number;
+    }
+
+    public boolean isTutorial() {
+        return number == TUTORIAL;
     }
 
     public int getNumber() {

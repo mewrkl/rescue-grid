@@ -21,7 +21,7 @@ class LevelLoaderTest {
     private final LevelLoader loader = new LevelLoader();
 
     @ParameterizedTest
-    @ValueSource(ints = {1, 2, 3})
+    @ValueSource(ints = {0, 1, 2, 3})
     void realLevelsLoad(int levelNumber) {
         LevelData level = LevelData.forLevel(levelNumber);
         GameBoard board = loader.load(level);
@@ -84,7 +84,7 @@ class LevelLoaderTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {1, 2, 3})
+    @ValueSource(ints = {0, 1, 2, 3})
     void survivorsOnlyAppearOnTheirSpots(int levelNumber) {
         LevelData level = LevelData.forLevel(levelNumber);
         String[] rows = loader.readLines(level.getFileName());

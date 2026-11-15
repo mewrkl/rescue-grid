@@ -21,7 +21,7 @@ class LevelFlowTest {
     private static final double FRAME = 1.0 / 60;
 
     @ParameterizedTest
-    @ValueSource(ints = {1, 2, 3})
+    @ValueSource(ints = {0, 1, 2, 3})
     void theTeamStartsNextToTheExit(int levelNumber) {
         GameBoard board = new LevelLoader().load(LevelData.forLevel(levelNumber));
         Rescuer rescuer = board.getActiveRescuer();

@@ -10,6 +10,7 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.glutils.HdpiUtils;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
+import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.utils.ScreenUtils;
 
@@ -24,6 +25,7 @@ import rescuegrid.logic.LevelLoader;
 import rescuegrid.logic.MovementCalculator;
 import rescuegrid.logic.ObjectiveTracker;
 import rescuegrid.logic.TurnManager;
+import rescuegrid.logic.Tutorial;
 import rescuegrid.model.Direction;
 import rescuegrid.model.GameBoard;
 import rescuegrid.model.GameState;
@@ -66,6 +68,9 @@ public class GamePanel extends BaseScreen {
     private final HudPanel hud;
     private final ObjectivePanel objectivePanel;
     private final ObjectiveTracker objectives;
+    private final Table tutorialCard;
+    private final Label tutorialStep;
+    private final Label tutorialPrompt;
     private final Toast toast;
     private final Table pauseCard;
     private final Camera camera;
@@ -79,6 +84,7 @@ public class GamePanel extends BaseScreen {
     private GameBoard board;
     private LevelData level;
     private TurnManager turns;
+    private Tutorial tutorial; // null except in the training level
     private GameState state;
     private double shakeSecondsLeft;
     private int shakePixels;
@@ -91,6 +97,9 @@ public class GamePanel extends BaseScreen {
         this.hud = new HudPanel(style, this);
         this.objectivePanel = new ObjectivePanel(style);
         this.objectives = new ObjectiveTracker();
+        this.tutorialStep = style.pixelLabel(" ", 8, UiStyle.TEXT_SECONDARY);
+        this.tutorialPrompt = style.label(" ", UiStyle.TEXT);
+        this.tutorialCard = buildTutorialCard();
         this.toast = new Toast(style);
         this.pauseCard = buildPauseCard();
         this.camera = new Camera(VIEW_ROWS, VIEW_COLS, TILE_SIZE);
@@ -108,10 +117,23 @@ public class GamePanel extends BaseScreen {
         Table mapArea = new Table();
         mapArea.add(objectivePanel).left().top().pad(16).row();
         mapArea.add(pauseCard).expand().row();
+        mapArea.add(tutorialCard).padBottom(8).row();
         mapArea.add(toast).padBottom(32);
         root.add(mapArea).width(VIEW_WIDTH).expandY().fillY();
         root.add(new Image(style.solid(UiStyle.BORDER))).width(1).fillY();
         root.add(hud).width(HudPanel.WIDTH - 1).fillY();
+    }
+
+    /** The training prompt near the bottom of the map: step number and what to do. */
+    private Table buildTutorialCard() {
+        Table card = new Table();
+        card.setBackground(style.smallCard());
+        card.defaults().left();
+        tutorialPrompt.setWrap(true);
+        card.add(tutorialStep).row();
+        card.add(tutorialPrompt).width(560).padTop(8).row();
+        card.setVisible(false);
+        return card;
     }
 
     /** A small card listing the pause keys. Hidden until Esc is pressed. */
@@ -135,14 +157,17 @@ public class GamePanel extends BaseScreen {
         board = loader.load(level, new Random()); // new Random(): survivors in different spots each time
         turns = new TurnManager(board, new HazardManager(level), level);
         minimap.setBoard(board);
+        tutorial = level.isTutorial() ? new Tutorial() : null;
+        tutorialCard.setVisible(tutorial != null);
         keys.clear();
         shakeSecondsLeft = 0;
         pauseCard.setVisible(false);
         movement.computeSight(board, active());
         camera.follow(active().getRow(), active().getCol(), board.getRows(), board.getCols());
-        toast.show("Save " + level.getTarget() + " of the " + level.getSurvivorCount() + " survivors");
-        hud.refresh(board, active(), turns, level);
-        objectivePanel.refresh(objectives.getObjectives(board, turns, level), objectives.getNextStep(board, turns));
+        if (tutorial == null) {
+            toast.show("Save " + level.getTarget() + " of the " + level.getSurvivorCount() + " survivors");
+        }
+        refreshPanels();
 
         sounds.loopMusic("gameplay");
         state = GameState.PLAYING;
@@ -202,12 +227,24 @@ public class GamePanel extends BaseScreen {
         shakeSecondsLeft = Math.max(0, shakeSecondsLeft - seconds);
 
         camera.follow(active().getDrawRow(), active().getDrawCol(), board.getRows(), board.getCols());
-        hud.refresh(board, active(), turns, level);
-        objectivePanel.refresh(objectives.getObjectives(board, turns, level), objectives.getNextStep(board, turns));
+        refreshPanels();
         keys.endFrame();
 
         if (turns.isMissionOver()) {
             finishLevel();
+        }
+    }
+
+    /** Updates the sidebar, the objectives and (in training) the tutorial prompt. */
+    private void refreshPanels() {
+        hud.refresh(board, active(), turns, level);
+        // In training the tutorial card says what to do, so the objectives show no "next step".
+        String next = tutorial == null ? objectives.getNextStep(board, turns) : null;
+        objectivePanel.refresh(objectives.getObjectives(board, turns, level), next);
+        if (tutorial != null) {
+            tutorial.update(board, turns);
+            tutorialStep.setText("TRAINING  " + tutorial.getStepNumber() + " / " + tutorial.getStepCount());
+            tutorialPrompt.setText(tutorial.getPrompt(turns));
         }
     }
 
@@ -233,6 +270,9 @@ public class GamePanel extends BaseScreen {
                 checkNotChangingGear();
                 toast.show(active().callBackup(board));
                 sounds.play("radio");
+                if (tutorial != null) {
+                    tutorial.onBackupCalled();
+                }
             } catch (InvalidMoveException e) {
                 sounds.play("denied");
                 toast.show(e.getMessage());
@@ -246,6 +286,9 @@ public class GamePanel extends BaseScreen {
                 String result = active().specialAction(board);
                 sounds.play(active().getSpecialSound());
                 toast.show(result);
+                if (tutorial != null) {
+                    tutorial.onAbility(active().getSpecialName());
+                }
             } catch (InvalidMoveException e) {
                 sounds.play("denied");
                 toast.show(e.getMessage());
@@ -275,6 +318,9 @@ public class GamePanel extends BaseScreen {
         }
         rescuer.moveTo(rescuer.getRow() + direction.getRowChange(), rescuer.getCol() + direction.getColChange());
         sounds.play("step");
+        if (tutorial != null) {
+            tutorial.onStep();
+        }
         afterStep();
     }
 

@@ -15,6 +15,10 @@ public class TurnManager {
 
     public static final double TICK_SECONDS = 3.0;
     public static final double WARNING_SECONDS = 5.0; // aftershock warning time
+    public static final double HELP_RANGE = 12;        // tiles: how far a call for help carries
+    public static final double HELP_INTERVAL = 6.0;    // seconds between one survivor's calls
+    public static final double HELP_CALL_SECONDS = 1.5; // how long each call shows on screen
+    private static final double HELP_OFFSET = 1.9;     // so survivors don't all call at once
 
     private final GameBoard board;
     private final HazardManager hazards;
@@ -26,6 +30,7 @@ public class TurnManager {
     private int ticksUntilAftershock;
     private boolean warningGiven;
     private boolean evacuated;
+    private final int[] lastCall; // which call each survivor made last (for the sound)
 
     public TurnManager(GameBoard board, HazardManager hazards, LevelData level) {
         this.board = board;
@@ -37,6 +42,7 @@ public class TurnManager {
         this.ticksUntilAftershock = level.getAftershockTicks();
         this.warningGiven = false;
         this.evacuated = false;
+        this.lastCall = new int[board.getSurvivors().size()];
     }
 
     /** Called every frame by GamePanel with the seconds since the last frame. */
@@ -54,6 +60,7 @@ public class TurnManager {
             hazards.planCollapses(board);
             events.add(new GameEvent(GameEvent.Type.AFTERSHOCK_WARNING, ""));
         }
+        checkHelpCalls();
         // If fire or a collapse downed the rescuer on the map, the next role takes over.
         if (board.getTeam().replaceDowned()) {
             events.add(new GameEvent(GameEvent.Type.ROLE_TAKEOVER,
@@ -147,6 +154,48 @@ public class TurnManager {
     /** True if the coming aftershock will collapse the tile at (row, col). */
     public boolean willCollapse(int row, int col) {
         return hazards.willCollapse(board, row, col);
+    }
+
+    /**
+     * Survivors nobody has found yet call for help every HELP_INTERVAL seconds, if
+     * the rescuer is within HELP_RANGE tiles (through walls: you can hear them).
+     * Returns the ones calling right now, so the game can show where they are.
+     */
+    public List<Survivor> getCallingSurvivors() {
+        List<Survivor> calling = new ArrayList<>();
+        List<Survivor> survivors = board.getSurvivors();
+        for (int i = 0; i < survivors.size(); i++) {
+            Survivor survivor = survivors.get(i);
+            double phase = (elapsedSeconds + i * HELP_OFFSET) % HELP_INTERVAL;
+            if (phase < HELP_CALL_SECONDS && canCall(survivor)) {
+                calling.add(survivor);
+            }
+        }
+        return calling;
+    }
+
+    private boolean canCall(Survivor survivor) {
+        if (!survivor.isWaiting() || survivor.isRevealed()) {
+            return false;
+        }
+        Rescuer rescuer = board.getActiveRescuer();
+        double rows = survivor.getRow() - rescuer.getRow();
+        double cols = survivor.getCol() - rescuer.getCol();
+        return Math.sqrt(rows * rows + cols * cols) <= HELP_RANGE;
+    }
+
+    /** Records a HELP_CALL event each time a survivor starts a new call (one sound per call). */
+    private void checkHelpCalls() {
+        List<Survivor> survivors = board.getSurvivors();
+        for (int i = 0; i < survivors.size(); i++) {
+            int call = (int) ((elapsedSeconds + i * HELP_OFFSET) / HELP_INTERVAL);
+            if (call != lastCall[i]) {
+                lastCall[i] = call;
+                if (canCall(survivors.get(i))) {
+                    events.add(new GameEvent(GameEvent.Type.HELP_CALL, ""));
+                }
+            }
+        }
     }
 
     /** Hands over everything that happened since the last call, and forgets it. */

@@ -74,6 +74,17 @@ public class CriticalSurvivor extends Survivor {
     }
 
     @Override
+    protected String whatTheyNeed() {
+        if (isBackupComing()) {
+            return null; // backup is handling it
+        }
+        if (!stabilised) {
+            return "Critical! Medic (1): face them, press E";
+        }
+        return "Stabilised: face them, press Q for backup";
+    }
+
+    @Override
     public String getInjuryName() {
         return "Critical";
     }

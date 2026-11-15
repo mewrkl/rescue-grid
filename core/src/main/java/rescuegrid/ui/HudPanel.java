@@ -27,8 +27,9 @@ public class HudPanel extends Table {
     private static final float CONTENT_WIDTH = WIDTH - 48;
     private static final double AFTERSHOCK_ALERT_SECONDS = 5.0;
     private static final int TEAM_SIZE = 3;
-    private static final int MAX_SURVIVORS = 5;
+    private static final int MAX_SURVIVORS = 6;
     private static final float ICON_SIZE = 32;
+    private static final float PIP_SIZE = 28;
 
     private final Label levelLabel;
     private final Label timeLabel;
@@ -44,6 +45,8 @@ public class HudPanel extends Table {
     private final ProgressBar cooldownBar;
     private final CarriedSurvivor carried;
     private final Table carryingRow;
+    private final CarriedSurvivor follower;
+    private final Table leadingRow;
 
     public HudPanel(UiStyle style, BaseScreen screen) {
         setBackground(style.solid(UiStyle.BACKGROUND));
@@ -71,14 +74,14 @@ public class HudPanel extends Table {
         Table pipRow = new Table();
         for (int i = 0; i < MAX_SURVIVORS; i++) {
             pips[i] = new SurvivorPip();
-            pipSlots[i] = screen.icon(pips[i], ICON_SIZE);
-            pipRow.add(pipSlots[i]).size(ICON_SIZE).padRight(8);
+            pipSlots[i] = screen.icon(pips[i], PIP_SIZE);
+            pipRow.add(pipSlots[i]).size(PIP_SIZE).padRight(4);
         }
         add(pipRow).padTop(8).row();
         goalLabel = style.label(" ", UiStyle.TEXT_SECONDARY);
         add(goalLabel).padTop(8).row();
 
-        add(heading(style, "TEAM")).padTop(24).row();
+        add(heading(style, "TEAM  (1 2 3 to change)")).padTop(24).row();
         Drawable[] faces = {new Medic(0, 0), new Engineer(0, 0), new DogHandler(0, 0)};
         numberLabels = new Label[TEAM_SIZE];
         nameLabels = new Label[TEAM_SIZE];
@@ -107,12 +110,23 @@ public class HudPanel extends Table {
         ability.add(style.keycap("E")).minWidth(32).height(32);
         ability.add(words).left().padLeft(12);
         add(ability).padTop(8).row();
+        Table backup = new Table();
+        backup.add(style.keycap("Q")).minWidth(32).height(32);
+        backup.add(style.label("Call backup (critical)", UiStyle.TEXT_SECONDARY)).left().padLeft(12);
+        add(backup).padTop(8).row();
 
         carried = new CarriedSurvivor();
         carryingRow = new Table();
         carryingRow.add(screen.icon(carried, ICON_SIZE)).size(ICON_SIZE);
         carryingRow.add(style.label("Carrying", UiStyle.TEXT_SECONDARY)).padLeft(12);
-        add(carryingRow).padTop(12).row();
+        follower = new CarriedSurvivor();
+        leadingRow = new Table();
+        leadingRow.add(screen.icon(follower, ICON_SIZE)).size(ICON_SIZE);
+        leadingRow.add(style.label("Following you", UiStyle.TEXT_SECONDARY)).padLeft(12);
+        Table withYou = new Table();
+        withYou.add(carryingRow).left().row();
+        withYou.add(leadingRow).left().padTop(8);
+        add(withYou).padTop(16).row();
 
         add().expandY().row();
         Table pause = new Table();
@@ -127,7 +141,7 @@ public class HudPanel extends Table {
 
     /** Updates everything from the current game. Called every frame by GamePanel. */
     public void refresh(GameBoard board, Rescuer active, TurnManager turns, LevelData level) {
-        levelLabel.setText("LEVEL " + level.getNumber());
+        levelLabel.setText(level.getTitle());
         timeLabel.setText(formatTime(turns.getElapsedSeconds()));
         refreshAftershock(turns, level);
         refreshSurvivors(board, turns, level);
@@ -199,6 +213,8 @@ public class HudPanel extends Table {
 
         carried.set(active.getCarriedSurvivor());
         carryingRow.setVisible(active.isCarrying());
+        follower.set(active.getFollower());
+        leadingRow.setVisible(active.isLeading());
     }
 
     private String formatTime(double seconds) {

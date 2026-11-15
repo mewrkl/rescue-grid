@@ -15,10 +15,11 @@ public class LevelData {
     private final int aftershockTicks;
     private final int survivorCondition;
     private final String randomSurvivorTypes;
+    private final double fireSpreadChance;
     private final long seed;
 
     private LevelData(int number, String fileName, int survivorCount, int target, int aftershockTicks,
-                      int survivorCondition, String randomSurvivorTypes, long seed) {
+                      int survivorCondition, String randomSurvivorTypes, double fireSpreadChance, long seed) {
         this.number = number;
         this.fileName = fileName;
         this.survivorCount = survivorCount;
@@ -26,6 +27,7 @@ public class LevelData {
         this.aftershockTicks = aftershockTicks;
         this.survivorCondition = survivorCondition;
         this.randomSurvivorTypes = randomSurvivorTypes;
+        this.fireSpreadChance = fireSpreadChance;
         this.seed = seed;
     }
 
@@ -36,11 +38,11 @@ public class LevelData {
     public static LevelData forLevel(int number) {
         switch (number) {
             case 1:
-                return new LevelData(1, "/levels/level1.txt", 3, 2, 15, 20, "ms", 1001L);
+                return new LevelData(1, "/levels/level1.txt", 4, 3, 15, 20, "ms", 0.15, 1001L);
             case 2:
-                return new LevelData(2, "/levels/level2.txt", 4, 3, 12, 25, "msm", 2002L);
+                return new LevelData(2, "/levels/level2.txt", 5, 4, 12, 25, "msm", 0.20, 2002L);
             case 3:
-                return new LevelData(3, "/levels/level3.txt", 5, 4, 9, 30, "msms", 3003L);
+                return new LevelData(3, "/levels/level3.txt", 6, 4, 9, 30, "msms", 0.25, 3003L);
             default:
                 throw new IllegalArgumentException("There is no level " + number);
         }
@@ -48,6 +50,11 @@ public class LevelData {
 
     public boolean hasNextLevel() {
         return number < LEVEL_COUNT;
+    }
+
+    /** What the HUD calls this level. */
+    public String getTitle() {
+        return "LEVEL " + number;
     }
 
     public int getNumber() {
@@ -75,6 +82,11 @@ public class LevelData {
     /** How many world ticks a survivor lasts before being lost (without healing). */
     public int getSurvivorCondition() {
         return survivorCondition;
+    }
+
+    /** The chance (0 to 1) that a fire spreads to each neighbouring floor tile per world tick. */
+    public double getFireSpreadChance() {
+        return fireSpreadChance;
     }
 
     /** One letter per random survivor: 'm' minor, 's' serious, '!' critical. */

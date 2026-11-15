@@ -122,7 +122,7 @@ class SurvivorTypesTest {
     @Test
     void backupCarriesThemOutAfterTheCountdownEvenIfYouLeave() throws InvalidMoveException {
         LevelData level = LevelData.forLevel(1);
-        TurnManager turns = new TurnManager(board, new HazardManager(level.getSeed()), level);
+        TurnManager turns = new TurnManager(board, new HazardManager(level), level);
         critical.treat(0);
         critical.callBackup();
         medic.moveTo(2, 1); // walk away: you don't have to wait

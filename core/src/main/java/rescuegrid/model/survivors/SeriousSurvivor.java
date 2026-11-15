@@ -28,6 +28,11 @@ public class SeriousSurvivor extends Survivor {
     }
 
     @Override
+    protected String whatTheyNeed() {
+        return "Serious: walk onto them to carry them";
+    }
+
+    @Override
     public String getInjuryName() {
         return "Serious";
     }

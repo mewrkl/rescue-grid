@@ -29,7 +29,7 @@ class TurnManagerTest {
         LevelLoader loader = new LevelLoader();
         GameBoard board = loader.load(level);
         String[] rows = loader.readLines(level.getFileName());
-        TurnManager turns = new TurnManager(board, new HazardManager(level.getSeed()), level);
+        TurnManager turns = new TurnManager(board, new HazardManager(level), level);
 
         double aftershockAt = -1;
         double warningAt = -1;
@@ -63,7 +63,7 @@ class TurnManagerTest {
     void doingNothingFailsTheMissionAndFireBurnsOut(int levelNumber) {
         LevelData level = LevelData.forLevel(levelNumber);
         GameBoard board = new LevelLoader().load(level);
-        TurnManager turns = new TurnManager(board, new HazardManager(level.getSeed()), level);
+        TurnManager turns = new TurnManager(board, new HazardManager(level), level);
 
         while (!turns.isMissionOver() && turns.getElapsedSeconds() < 300) {
             turns.update(FRAME);
@@ -90,7 +90,7 @@ class TurnManagerTest {
     void theTeamCanOnlyLeaveOnceTheTargetIsRescued() {
         LevelData level = LevelData.forLevel(1);
         GameBoard board = new LevelLoader().load(level);
-        TurnManager turns = new TurnManager(board, new HazardManager(level.getSeed()), level);
+        TurnManager turns = new TurnManager(board, new HazardManager(level), level);
 
         assertFalse(turns.evacuate(), "can't leave with nobody rescued");
         assertFalse(turns.isMissionOver());
@@ -113,7 +113,7 @@ class TurnManagerTest {
     void theWarningShowsExactlyTheTilesThatCollapse(int levelNumber) {
         LevelData level = LevelData.forLevel(levelNumber);
         GameBoard board = new LevelLoader().load(level);
-        TurnManager turns = new TurnManager(board, new HazardManager(level.getSeed()), level);
+        TurnManager turns = new TurnManager(board, new HazardManager(level), level);
         while (!turns.isAftershockComing()) {
             turns.update(FRAME);
         }

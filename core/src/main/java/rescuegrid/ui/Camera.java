@@ -69,6 +69,15 @@ public class Camera {
         return (float) (row * tileSize);
     }
 
+    /** Where a column is on the screen right now, in pixels (can be off screen). */
+    public float toScreenX(double col) {
+        return toMapX(col) - offsetX;
+    }
+
+    public float toScreenY(double row) {
+        return toMapY(row) - offsetY;
+    }
+
     /** The first map column that is at least partly on screen. */
     public int getFirstCol() {
         return (int) Math.floor(offsetX / tileSize);

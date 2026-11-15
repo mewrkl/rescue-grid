@@ -179,6 +179,11 @@ public class UiStyle implements Disposable {
         return padded(roundedBox(SURFACE, BORDER, 1, CARD_RADIUS), 24, 24);
     }
 
+    /** A smaller floating card (the objective tracker): same look, 16 px padding. */
+    public Drawable smallCard() {
+        return padded(roundedBox(SURFACE, BORDER, 1, CARD_RADIUS), 16, 16);
+    }
+
     private static NinePatchDrawable padded(NinePatchDrawable drawable, float horizontal, float vertical) {
         drawable.setLeftWidth(horizontal);
         drawable.setRightWidth(horizontal);

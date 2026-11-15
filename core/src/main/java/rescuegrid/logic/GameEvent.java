@@ -14,6 +14,7 @@ public class GameEvent {
         FIRE_SPREAD,
         SURVIVOR_LOST,
         BACKUP_ARRIVED,
+        HELP_CALL,
         AFTERSHOCK_WARNING,
         AFTERSHOCK
     }

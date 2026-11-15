@@ -21,15 +21,22 @@ import rescuegrid.model.tiles.Tile;
  */
 public class HazardManager {
 
-    public static final double SPREAD_CHANCE = 0.25;
     public static final int RANDOM_COLLAPSES = 3;
 
     private final Random random;
+    private final double spreadChance;
     private final List<Tile> plannedCollapses;
 
-    public HazardManager(long seed) {
+    /** Seed and fire spread chance come from the level (LevelData). */
+    public HazardManager(long seed, double spreadChance) {
         this.random = new Random(seed);
+        this.spreadChance = spreadChance;
         this.plannedCollapses = new ArrayList<>();
+    }
+
+    /** Uses the level's own seed and fire spread chance. */
+    public HazardManager(LevelData level) {
+        this(level.getSeed(), level.getFireSpreadChance());
     }
 
     /** Step 1 of the tick: the rescuer on the map loses 1 health if they stand next to fire. */
@@ -40,7 +47,7 @@ public class HazardManager {
         }
     }
 
-    /** Step 2: each fire tries to spread to each flammable neighbour (SPREAD_CHANCE each). */
+    /** Step 2: each fire tries to spread to each flammable neighbour (spreadChance each). */
     public void spreadFire(GameBoard board, List<GameEvent> events) {
         // 1. Collect the tiles that will catch fire.
         List<Tile> catching = new ArrayList<>();
@@ -57,7 +64,7 @@ public class HazardManager {
                         || board.getRescuerAt(row, col) != null) {
                     continue;
                 }
-                if (random.nextDouble() < SPREAD_CHANCE) {
+                if (random.nextDouble() < spreadChance) {
                     alreadyChosen[row][col] = true;
                     catching.add(neighbour);
                 }

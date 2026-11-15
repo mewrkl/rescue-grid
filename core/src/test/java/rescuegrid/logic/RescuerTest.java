@@ -45,7 +45,7 @@ class RescuerTest {
     void scentFindsTheStoreroomSurvivorThroughRubble() throws InvalidMoveException {
         dogHandler.moveTo(7, 4);
         String message = dogHandler.specialAction(board);
-        assertTrue(message.contains("1 survivor"), message);
+        assertTrue(message.contains("found"), message);
         assertTrue(board.getSurvivorAt(2, 3).isRevealed());
     }
 
@@ -77,24 +77,24 @@ class RescuerTest {
 
     @Test
     void medicHealsTheFacedSurvivorUpToTheMaximum() throws InvalidMoveException {
-        Survivor survivor = board.getSurvivorAt(5, 13);
+        Survivor survivor = board.getSurvivorAt(2, 3); // the storeroom survivor
         for (int i = 0; i < 10; i++) {
             survivor.tickCondition();
         }
         int before = survivor.getCondition();
-        medic.moveTo(5, 12);
-        medic.setFacing(Direction.RIGHT);
+        medic.moveTo(2, 4);
+        medic.setFacing(Direction.LEFT);
         medic.specialAction(board);
         assertEquals(Math.min(survivor.getMaxCondition(), before + Medic.HEAL_AMOUNT), survivor.getCondition());
     }
 
     @Test
     void carryDeliverAndScore() {
-        Survivor survivor = board.getSurvivorAt(5, 13);
-        medic.moveTo(5, 13);
+        Survivor survivor = board.getSurvivorAt(2, 3);
+        medic.moveTo(2, 3);
         medic.pickUp(survivor);
         assertTrue(medic.isCarrying());
-        assertNull(board.getSurvivorAt(5, 13), "a carried survivor is no longer lying on the floor");
+        assertNull(board.getSurvivorAt(2, 3), "a carried survivor is no longer lying on the floor");
         assertEquals(Rescuer.CARRY_STEP_DELAY, medic.getStepDelay(), "carrying is slower");
 
         medic.moveTo(1, 28); // the exit

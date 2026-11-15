@@ -93,7 +93,7 @@ class LevelLoaderTest {
             assertEquals(level.getSurvivorCount(), board.getSurvivors().size());
             for (Survivor survivor : board.getSurvivors()) {
                 char symbol = rows[survivor.getRow()].charAt(survivor.getCol());
-                assertTrue(symbol == 'S' || symbol == '?', "survivor on '" + symbol + "'");
+                assertTrue("Sm!T?".indexOf(symbol) >= 0, "survivor on '" + symbol + "'");
             }
         }
     }

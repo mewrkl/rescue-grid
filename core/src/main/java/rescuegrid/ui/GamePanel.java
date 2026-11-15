@@ -22,6 +22,7 @@ import rescuegrid.logic.InvalidMoveException;
 import rescuegrid.logic.LevelData;
 import rescuegrid.logic.LevelLoader;
 import rescuegrid.logic.MovementCalculator;
+import rescuegrid.logic.ObjectiveTracker;
 import rescuegrid.logic.TurnManager;
 import rescuegrid.model.Direction;
 import rescuegrid.model.GameBoard;
@@ -63,6 +64,8 @@ public class GamePanel extends BaseScreen {
     private final SoundManager sounds;
     private final Painter painter;
     private final HudPanel hud;
+    private final ObjectivePanel objectivePanel;
+    private final ObjectiveTracker objectives;
     private final Toast toast;
     private final Table pauseCard;
     private final Camera camera;
@@ -86,6 +89,8 @@ public class GamePanel extends BaseScreen {
         this.sounds = game.getSounds();
         this.painter = game.getPainter();
         this.hud = new HudPanel(style, this);
+        this.objectivePanel = new ObjectivePanel(style);
+        this.objectives = new ObjectiveTracker();
         this.toast = new Toast(style);
         this.pauseCard = buildPauseCard();
         this.camera = new Camera(VIEW_ROWS, VIEW_COLS, TILE_SIZE);
@@ -98,9 +103,10 @@ public class GamePanel extends BaseScreen {
         this.shakeRandom = new Random();
         this.state = GameState.MENU;
 
-        // Left: the map area, with the pause card in the middle and messages near the bottom.
-        // Right: a 1 px line and the HUD.
+        // Left: the map area, with the objectives top left, the pause card in the
+        // middle and messages near the bottom. Right: a 1 px line and the HUD.
         Table mapArea = new Table();
+        mapArea.add(objectivePanel).left().top().pad(16).row();
         mapArea.add(pauseCard).expand().row();
         mapArea.add(toast).padBottom(32);
         root.add(mapArea).width(VIEW_WIDTH).expandY().fillY();
@@ -127,7 +133,7 @@ public class GamePanel extends BaseScreen {
     public void startLevel(int levelNumber) {
         level = LevelData.forLevel(levelNumber);
         board = loader.load(level, new Random()); // new Random(): survivors in different spots each time
-        turns = new TurnManager(board, new HazardManager(level.getSeed()), level);
+        turns = new TurnManager(board, new HazardManager(level), level);
         minimap.setBoard(board);
         keys.clear();
         shakeSecondsLeft = 0;
@@ -136,6 +142,7 @@ public class GamePanel extends BaseScreen {
         camera.follow(active().getRow(), active().getCol(), board.getRows(), board.getCols());
         toast.show("Save " + level.getTarget() + " of the " + level.getSurvivorCount() + " survivors");
         hud.refresh(board, active(), turns, level);
+        objectivePanel.refresh(objectives.getObjectives(board, turns, level), objectives.getNextStep(board, turns));
 
         sounds.loopMusic("gameplay");
         state = GameState.PLAYING;
@@ -196,6 +203,7 @@ public class GamePanel extends BaseScreen {
 
         camera.follow(active().getDrawRow(), active().getDrawCol(), board.getRows(), board.getCols());
         hud.refresh(board, active(), turns, level);
+        objectivePanel.refresh(objectives.getObjectives(board, turns, level), objectives.getNextStep(board, turns));
         keys.endFrame();
 
         if (turns.isMissionOver()) {
@@ -380,6 +388,9 @@ public class GamePanel extends BaseScreen {
                 case BACKUP_ARRIVED:
                     sounds.play("rescued");
                     break;
+                case HELP_CALL:
+                    sounds.play("help_call");
+                    break;
                 case AFTERSHOCK_WARNING:
                     sounds.play("aftershock_warning");
                     shake(WARNING_SHAKE_SECONDS, WARNING_SHAKE_PIXELS);
@@ -428,15 +439,20 @@ public class GamePanel extends BaseScreen {
         drawSurvivors();
         drawFacedTile();
         drawRescuer();
+        drawHelpCalls();
         painter.end();
     }
 
     /** Things on top of the map that never scroll or shake: the minimap and the pause veil. */
     private void drawOverlay() {
         painter.begin(overlayCamera.combined);
+        // Bottom-right corner: the objectives use the top-left, and the exit is often at the top.
         float width = board.getCols() * MINIMAP_SCALE;
-        minimap.draw(painter, VIEW_WIDTH - width - MINIMAP_MARGIN, MINIMAP_MARGIN, MINIMAP_SCALE, assets);
+        float height = board.getRows() * MINIMAP_SCALE;
+        minimap.draw(painter, VIEW_WIDTH - width - MINIMAP_MARGIN, VIEW_HEIGHT - height - MINIMAP_MARGIN,
+                MINIMAP_SCALE, assets);
         drawEdgeGlow();
+        drawHelpArrows();
         if (state == GameState.PAUSED) {
             painter.fillRect(PAUSE_SCRIM, 0, 0, VIEW_WIDTH, VIEW_HEIGHT);
         }
@@ -480,6 +496,53 @@ public class GamePanel extends BaseScreen {
                     painter.outlineRect(edge, x, y, TILE_SIZE, TILE_SIZE, 2);
                 }
             }
+        }
+    }
+
+    /**
+     * A survivor calling for help shows a ring and "HELP!" where they are, even in
+     * the dark. You know roughly where to go, but you still have to find the way.
+     */
+    private void drawHelpCalls() {
+        float ring = (float) ((turns.getElapsedSeconds() * 1.5) % 1.0); // grows from 0 to 1, then restarts
+        Color edge = new Color(1, 1, 1, 0.9f * (1 - ring));
+        for (Survivor survivor : turns.getCallingSurvivors()) {
+            if (!camera.isInView(survivor.getRow(), survivor.getCol())) {
+                continue;
+            }
+            float cx = camera.toMapX(survivor.getCol()) + TILE_SIZE / 2f;
+            float cy = camera.toMapY(survivor.getRow()) + TILE_SIZE / 2f;
+            float size = TILE_SIZE * (0.4f + 1.2f * ring);
+            painter.outlineOval(edge, cx - size / 2, cy - size / 2, size, size, 2);
+            painter.text("HELP!", Color.WHITE, cx, cy - TILE_SIZE * 0.8f);
+        }
+    }
+
+    /** For calls from off screen: an arrow at the edge of the view pointing towards them. */
+    private void drawHelpArrows() {
+        float centerX = VIEW_WIDTH / 2f;
+        float centerY = VIEW_HEIGHT / 2f;
+        float margin = 40;
+        for (Survivor survivor : turns.getCallingSurvivors()) {
+            if (camera.isInView(survivor.getRow(), survivor.getCol())) {
+                continue;
+            }
+            float dx = camera.toScreenX(survivor.getCol()) + TILE_SIZE / 2f - centerX;
+            float dy = camera.toScreenY(survivor.getRow()) + TILE_SIZE / 2f - centerY;
+            // Walk out from the middle until we touch the edge of the view (minus a margin).
+            float scale = Math.min((centerX - margin) / Math.max(1, Math.abs(dx)),
+                    (centerY - margin) / Math.max(1, Math.abs(dy)));
+            float x = centerX + dx * scale;
+            float y = centerY + dy * scale;
+            float length = (float) Math.sqrt(dx * dx + dy * dy);
+            float ux = dx / length;
+            float uy = dy / length;
+            float tip = 14;
+            painter.fillPolygon(Color.WHITE,
+                    x + ux * tip, y + uy * tip,
+                    x - ux * tip / 2 - uy * tip * 0.7f, y - uy * tip / 2 + ux * tip * 0.7f,
+                    x - ux * tip / 2 + uy * tip * 0.7f, y - uy * tip / 2 - ux * tip * 0.7f);
+            painter.text("HELP!", Color.WHITE, x - ux * 28, y - uy * 28 - 6);
         }
     }
 

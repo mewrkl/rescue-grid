@@ -93,7 +93,7 @@ class RescueTeamTest {
     void theMissionFailsOnlyWhenAllThreeAreDown() {
         LevelData level = LevelData.forLevel(1);
         GameBoard real = new LevelLoader().load(level);
-        TurnManager turns = new TurnManager(real, new HazardManager(level.getSeed()), level);
+        TurnManager turns = new TurnManager(real, new HazardManager(level), level);
         for (int i = 0; i < 2; i++) {
             real.getActiveRescuer().takeDamage(Rescuer.MAX_HEALTH);
             turns.update(0.01);

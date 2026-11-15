@@ -71,6 +71,17 @@ public abstract class Survivor implements Drawable {
     /** How many condition points this survivor loses every world tick. */
     public abstract int getConditionLossPerTick();
 
+    /** What to do for this survivor (shown in the objective panel), or null if nothing is needed. */
+    protected abstract String whatTheyNeed();
+
+    /** The next thing the player should do for this survivor, or null if nothing is needed. */
+    public String getNeed() {
+        if (trapped) {
+            return "Trapped! Engineer (2): face them, press E";
+        }
+        return whatTheyNeed();
+    }
+
     /** What this survivor does when a rescuer reaches them (follow, be carried, or refuse). */
     protected abstract void goWith(Rescuer rescuer) throws InvalidMoveException;
 

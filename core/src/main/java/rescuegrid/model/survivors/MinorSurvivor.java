@@ -29,6 +29,11 @@ public class MinorSurvivor extends Survivor {
     }
 
     @Override
+    protected String whatTheyNeed() {
+        return "Minor: walk onto them, they follow you";
+    }
+
+    @Override
     public String getInjuryName() {
         return "Minor";
     }

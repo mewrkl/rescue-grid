@@ -29,7 +29,7 @@ public class ResultPanel extends BaseScreen {
         scoreLabel = style.pixelLabel(" ", 24, UiStyle.TEXT);
 
         // Score breakdown: name on the left, points on the right.
-        String[] names = {"Survivors rescued", "Health remaining", "Everyone rescued bonus", "Time bonus"};
+        String[] names = {"Survivors rescued", "Health remaining", "Everyone rescued bonus"};
         pointLabels = new Label[names.length];
         Table breakdown = new Table();
         for (int i = 0; i < names.length; i++) {
@@ -56,14 +56,15 @@ public class ResultPanel extends BaseScreen {
         titleLabel.setText(finishedGame ? "ALL LEVELS CLEARED"
                 : success ? complete : "MISSION FAILED");
         String name = level.isTutorial() ? "Training" : "Level " + level.getNumber();
-        summaryLabel.setText(name + ": rescued " + board.getRescuedCount()
+        int total = (int) seconds;
+        String time = String.format("%d:%02d", total / 60, total % 60);
+        summaryLabel.setText(name + " in " + time + ": rescued " + board.getRescuedCount()
                 + " of " + board.getSurvivors().size() + " survivors (needed " + level.getTarget() + ")");
 
         pointLabels[0].setText(String.valueOf(scoreKeeper.rescuePoints(board)));
         pointLabels[1].setText(String.valueOf(scoreKeeper.healthPoints(board)));
         pointLabels[2].setText(String.valueOf(scoreKeeper.allRescuedBonus(board)));
-        pointLabels[3].setText(String.valueOf(scoreKeeper.timeBonus(seconds)));
-        scoreLabel.setText("SCORE " + scoreKeeper.calculateScore(board, seconds));
+        scoreLabel.setText("SCORE " + scoreKeeper.calculateScore(board));
 
         // The first option is what the player most likely wants next.
         menu.clearOptions();

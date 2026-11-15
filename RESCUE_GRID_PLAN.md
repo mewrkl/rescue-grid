@@ -1,6 +1,13 @@
-# Rescue Grid: Game Plan (v3)
+# Rescue Grid: Game Plan (v4)
 
 This document describes the game we are building, its rules, its class design, and how we want to build it. Read all of it before writing any code. If something here is unclear or seems wrong, ask before changing the design.
+
+> **What changed in v4 (2026-11-15), after the teacher's feedback on the first showing**
+> - **One rescuer on the map who changes role** (1/2/3, a 1 s gear change) instead of three rescuers to manage. Nobody is left behind any more. See `decisions/0007`.
+> - **Survivors have triage injury types:** minor (green) follow you, serious (yellow) are carried, critical (red) must be stabilised by the Medic and fetched by backup (Q). Any survivor can be trapped under debris until the Engineer frees them. See `decisions/0008` and `0009`.
+> - **Better level flow:** you start beside the exit, survivors are grouped in rooms, survivors you haven't found call for help, an objective checklist shows what to do, and a **training level** comes before Level 1. See `decisions/0010`.
+> - The time bonus is gone from scoring.
+> - New classes: `RescueTeam`, `MinorSurvivor`, `SeriousSurvivor`, `CriticalSurvivor`, `ObjectiveTracker`, `Objective`, `Tutorial`, `ObjectivePanel`. `Survivor` is now abstract.
 
 > **What changed in v3 (2026-11-09): Swing → libGDX.** Our teacher asked us to use libGDX and libraries instead of Swing. The game rules, class names and OOP design are unchanged; only the window, drawing, input, sound and screens moved to libGDX. See section 3 and `decisions/0004`.
 
@@ -35,7 +42,7 @@ This document describes the game we are building, its rules, its class design, a
 
 ## 2. Game Summary
 
-Rescue Grid is a real-time, top-down rescue game set inside a building that collapsed after an earthquake. The player controls a team of three rescuers with different skills and switches between them at any time. They explore the dark, damaged building, find trapped survivors, and carry them to the exit. Meanwhile fire spreads and aftershocks change the layout of the building.
+Rescue Grid is a real-time, top-down rescue game set inside a building that collapsed after an earthquake. The player controls one rescuer who can change role at any time: Medic, Engineer or Dog Handler. Each survivor needs something different (walk them out, carry them, stabilise them and call backup, or free them from debris), so changing to the right role is the puzzle. They explore the dark, damaged building, find trapped survivors, and carry them to the exit. Meanwhile fire spreads and aftershocks change the layout of the building.
 
 The theme is based on real events. Cebu was hit by a magnitude 6.9 earthquake on September 30, 2025, and the aftershocks that followed made damaged buildings dangerous to enter.
 
@@ -105,10 +112,10 @@ All numbers marked *(tune)* are starting values. Change them during testing, and
 
 The game runs in real time, but the **world** only changes on a **world tick** every **3 seconds** *(tune)*. The world tick takes the place of the old End Turn. On each tick, `TurnManager` runs these steps **in exactly this order**:
 
-1. **Fire damage:** every active rescuer orthogonally next to a Fire tile takes 1 damage.
-2. **Fire spreads:** each Fire tile tries to spread to each orthogonal neighbour that burns (plain Floor), with a 25% chance each *(tune)*. Fire never spreads onto a tile with a rescuer on it.
+1. **Fire damage:** the rescuer on the map takes 1 damage if they stand orthogonally next to a Fire tile.
+2. **Fire spreads:** each Fire tile tries to spread to each orthogonal neighbour that burns (plain Floor), with the level's spread chance: 8% in training, 15% / 20% / 25% in Levels 1 / 2 / 3 *(tune)*. Fire never spreads onto a tile with a rescuer on it.
 3. **Fire burns out:** each Fire tile ages by 1. At age 6 it becomes BurntFloor.
-4. **Survivor condition:** every survivor not yet rescued loses 1 condition. Survivors at 0 are lost.
+4. **Survivor condition:** every survivor not yet rescued loses condition (1, 2 or 3 points, by injury type, see 4.4). Survivors at 0 are lost.
 5. **Aftershock countdown:** drops by 1, and an aftershock happens if it reaches 0 (see 4.5).
 6. **End check:** see 4.6.
 
@@ -118,16 +125,16 @@ The order matters. Damage is applied before fire spreads, so you are only hurt b
 
 ### 4.3 Rescuers
 
-The player has three rescuers. All share these stats:
+The team has three roles (decision 0007). **Only one is on the map at a time.** All share these stats:
 - **Health:** 5 *(tune)*
 - **Walk speed:** 1 tile every 0.15 s, or every 0.30 s while carrying a survivor *(tune)*
 
-You control **one rescuer at a time**. Press 1, 2, 3 or Tab to switch, and the camera jumps to that rescuer. The others stay where they are, and **they can still be hurt** by fire and aftershocks. The HUD shows all three health bars so you notice.
+Press 1, 2, 3 or Tab to **change role**. The new role takes over the same spot, facing, and anyone being carried or led, after a **1 s gear change** *(tune)* during which you can't move or act. Each role keeps **its own health and cooldown**; cooldowns keep recharging while a role is off the map. Fire and aftershocks only hurt the role on the map, so changing to a healthy role is a way to survive. The HUD shows all three health bars.
 
 | Rescuer | Special action (E) | Cooldown |
 |---|---|---|
-| Medic | Heals the survivor she is carrying, or a revealed survivor on the tile she is facing. Restores 8 condition, up to the max | 4 s *(tune)* |
-| Engineer | Clears the Rubble tile he is facing into Floor | 3 s *(tune)* |
+| Medic | Treats the survivor she is carrying or leading, or one on her tile or the tile she faces. Restores 16 condition points (8 ticks of a serious survivor), up to the max. **Treating a critical survivor also stabilises them** | 4 s *(tune)* |
+| Engineer | Clears the Rubble tile he is facing into Floor, or **lifts the debris off a trapped survivor** on his tile or the tile he faces | 3 s *(tune)* |
 | Dog Handler | **Scent:** reveals every survivor within 8 walking steps. The scent follows corridors and passes through rubble, but not walls. Revealed survivors appear on the minimap. No target needed | 8 s *(tune)* |
 
 **Movement rules:**
@@ -135,7 +142,9 @@ You control **one rescuer at a time**. Press 1, 2, 3 or Tab to switch, and the c
 - A rescuer can only step onto walkable tiles, and never onto a tile with another rescuer on it.
 - Walking into a wall just doesn't move you. It does **not** throw an exception, because that would happen 60 times a second while you hold a key into a wall.
 
-**Downed rescuers:** when health reaches 0, the rescuer is downed and removed from play. A survivor they were carrying is dropped on their tile. If the downed rescuer was the one you were controlling, control switches to the next active rescuer.
+**Any role: Call backup (Q).** Facing or standing on a stabilised critical survivor, any role can radio for backup (see 4.4).
+
+**Downed roles:** when the role on the map reaches 0 health, the next standing role takes over at once, on the same tile, keeping whoever was being carried or led. A downed role can't be picked again this level. The mission fails when all three are down.
 
 ### 4.4 Survivors and fog
 
@@ -145,13 +154,20 @@ You control **one rescuer at a time**. Press 1, 2, 3 or Tab to switch, and the c
 - Tiles you can see right now are drawn normally. Tiles you have seen before but can't see now are drawn **dimmed**, showing their current state.
 - `MovementCalculator` computes what you can see with recursion (Section 8).
 
-**Survivors:**
-- Each level has several survivors on Floor tiles.
-- A survivor is **revealed** when it is inside the active rescuer's sight, or found by the Dog Handler's scent. Once revealed, it stays revealed and shows on the minimap.
-- **Picking up:** walking onto a survivor's tile with free hands picks it up automatically. A rescuer carries at most one survivor.
-- **Rescuing:** walking onto the Exit while carrying a survivor delivers it immediately.
-- **Condition:** drops by 1 every world tick. It starts at 20 / 25 / 30 in Levels 1 / 2 / 3, so a survivor lasts 60 / 75 / 90 s if left alone *(tune)*. Bigger buildings need more search time. At 0 the survivor is lost. Carried survivors keep losing condition too, which is why the Medic matters.
-- If fire spreads onto a survivor that is not being carried, that survivor is lost.
+**Survivors** (decision 0008, based on START triage colours):
+
+| Type | Tag | What you do | Drains per tick |
+|---|---|---|---|
+| `MinorSurvivor` | green | Walk onto them: they **follow one tile behind you**. You keep full speed and free hands. One follower at a time | 1 point |
+| `SeriousSurvivor` | yellow | Walk onto them to **carry** them (half speed). One carried at a time, but you can carry one and lead one | 2 points |
+| `CriticalSurvivor` | red | **Can't be moved.** The Medic treats them (E), which stabilises them. Then any role presses **Q** for backup, and they are rescued **10 s** later *(tune)* (decision 0009). You don't have to wait beside them | 3 points, 1 once stabilised |
+| Trapped (any type) | debris drawn over them | The Engineer lifts the debris (E), then they behave as their type | as their type |
+
+- Condition is counted in points: a survivor starts with `2 × the level's ticks` points, so a serious survivor lasts 20 / 25 / 30 ticks (60 / 75 / 90 s) in Levels 1 / 2 / 3, a minor one twice as long, and an unstabilised critical one two thirds as long *(tune)*. Carried and following survivors keep draining too.
+- A survivor is **revealed** when it is inside the rescuer's sight, or found by the Dog Handler's scent. Once revealed, it stays revealed and shows on the minimap.
+- **Calls for help:** a survivor nobody has found calls for help every 6 s *(tune)* while the rescuer is within 12 tiles (through walls: you can hear them). The call shows as an expanding ring and "HELP!" where they are, even in the fog, or as an arrow at the edge of the screen if they are off screen, plus a short sound.
+- **Rescuing:** walking onto the Exit delivers the carried survivor and the follower at once.
+- If fire spreads onto a survivor lying on the floor, that survivor is lost. Carried and following survivors are safe from fire.
 
 ### 4.5 Aftershocks
 
@@ -164,7 +180,7 @@ You control **one rescuer at a time**. Press 1, 2, 3 or Tab to switch, and the c
 - When an aftershock happens:
   1. **Every CrackedFloor tile becomes Rubble.** This is the designed path-blocker.
   2. The up to 3 Floor tiles chosen at the warning become Rubble *(tune)*. They are chosen from tiles with no rescuer or survivor on them and not next to the Exit. A chosen tile that caught fire in the meantime stays fire, and one where a survivor was put down doesn't collapse.
-  3. Every active rescuer takes 1 damage.
+  3. The rescuer on the map takes 1 damage.
   4. The countdown resets.
 - A cracked tile with a rescuer standing on it still collapses. The rescuer is pushed to a free neighbouring walkable tile, or takes 1 extra damage if there is none.
 - **Rubble never traps a level for good.** The Engineer can always clear it. A blocked path costs time, it is never a dead end.
@@ -174,7 +190,7 @@ You control **one rescuer at a time**. Press 1, 2, 3 or Tab to switch, and the c
 The end check runs every frame. The mission ends when:
 - the team **leaves through the exit**: once the target is reached, the active rescuer steps onto the Exit with empty hands (added 2026-11-09, see `decisions/0005`),
 - no survivors are left in the building (all rescued or lost), or
-- all rescuers are downed.
+- all three roles are downed.
 
 Leaving is refused before the target is reached; the HUD then says how many more are needed. After reaching the target the player chooses: leave now, or keep searching for the "everyone rescued" bonus.
 
@@ -182,22 +198,23 @@ The mission is a **success** if the number rescued is at least the level's targe
 
 | Level | Size (approx.) | Survivors | Target | Aftershock every |
 |---|---|---|---|---|
-| 1 | 30 × 20 | 3 | 2 | 15 ticks |
-| 2 | 35 × 25 | 4 | 3 | 12 ticks |
-| 3 | 40 × 30 | 5 | 4 | 9 ticks |
+| Training | 34 × 14 | 4 | 4 | 20 ticks |
+| 1 | 30 × 20 | 4 | 3 | 15 ticks |
+| 2 | 35 × 25 | 5 | 4 | 12 ticks |
+| 3 | 40 × 30 | 6 | 4 | 9 ticks |
 
 ### 4.7 Scoring
 
 - 100 points per survivor rescued
 - 20 points per remaining health point across all active rescuers
 - 50 bonus points if every survivor in the level was rescued
-- Time bonus: `max(0, 120 - secondsTaken)` points *(tune)*
+- No time bonus (removed 2026-11-15): rushing out should never score better than saving everyone. The result screen still shows the time taken.
 
 ---
 
 ## 5. Level Format
 
-Levels are text files, one character per tile, stored in `assets/levels/level1.txt`, `level2.txt`, `level3.txt`.
+Levels are text files, one character per tile, stored in `assets/levels/tutorial.txt`, `level1.txt`, `level2.txt`, `level3.txt`.
 - `LevelLoader` reads the file into a `String[]` (one string per line), then turns that array into a `GameBoard`.
 - Keep those two steps as separate methods. Then you can also build a board straight from a `String[]` written in code, which is handy for quick tests.
 
@@ -209,84 +226,106 @@ Levels are text files, one character per tile, stored in `assets/levels/level1.t
 | `R` | Rubble |
 | `F` | Fire |
 | `X` | Exit |
-| `S` | Survivor who is always there (on Floor) |
-| `?` | Possible survivor spot: the game picks some of these at random each time the level starts; the rest are Floor |
-| `M` | Medic start (on Floor) |
-| `E` | Engineer start (on Floor) |
-| `D` | Dog Handler start (on Floor) |
+| `S` | Serious survivor who is always there (on Floor) |
+| `m` | Minor survivor who is always there |
+| `!` | Critical survivor who is always there |
+| `T` | Serious survivor trapped under debris |
+| `?` | Possible survivor spot: the game picks some of these at random each time the level starts; the rest are Floor. The types of the random survivors come from `LevelData` (e.g. `"ms"` = one minor, one serious) |
+| `P` | Where the team starts, next to the exit (on Floor) |
 
 `LevelLoader` should throw a clear exception if:
 - the rows have different lengths,
 - the outer border is not all `#`,
 - there is not exactly one exit, or
-- any rescuer start is missing, or
+- there is not exactly one team start (`P`), or
 - there are not enough `?` spots to reach the level's survivor count.
 
-**Random survivor spots (added 2026-11-09, see `decisions/0006`):** each level has one fixed `S` (the survivor behind rubble, so the Engineer always matters) and several `?` spots. `LevelLoader` shuffles the `?` spots with `Collections.shuffle` and fills as many as the level needs. The building stays the same, but who is where changes every play. The tests pass a seeded `Random`, so they always get the same spots.
+**Random survivor spots (added 2026-11-09, see `decisions/0006`; grouped 2026-11-15, see `decisions/0010`):** each level has a fixed `S` (the survivor behind rubble, so the Engineer always matters), a fixed critical `!`, and several `?` spots grouped into 2 or 3 room clusters. `LevelLoader` shuffles the `?` spots with `Collections.shuffle` and fills as many as the level needs. The building stays the same, but who is where changes every play. The tests pass a seeded `Random`, so they always get the same spots.
 
 The border rule means the camera and the recursive flood fill can never walk off the map.
 
-### Level 1 (30 wide, 20 tall, 3 survivors, target 2)
+### Training (34 × 14, 4 survivors, all 4 needed)
+
+The map is in `assets/levels/tutorial.txt`. A row of rooms from the exit, each teaching one thing, then a hall with a small fire and a hidden room:
+
+```
+##################################
+#X....#........#........#.......##
+#P....#........#........#.......##
+#..............R................##
+#.....#...m....#....T...#...!...##
+#.....#........#........#.......##
+###.######################.#######
+#...............................##
+#........FFF....................##
+#...............................##
+####################.#############
+#..............#.....S.....#....##
+#..............#...........#....##
+##################################
+```
+
+The `Tutorial` class shows one prompt at a time at the bottom of the map: walk, follow a call for help, lead the minor survivor out, clear the rubble door as the Engineer, free the trapped survivor and carry them out, stabilise the critical survivor as the Medic and call backup, find the last survivor with the Dog Handler's scent, then leave. Anything done early still counts, so the player can't get stuck. An aftershock warning interrupts with a tip about the orange tiles. Survivors last 180 s, aftershocks come every 60 s, and fire barely spreads.
+
+### Level 1 (30 wide, 20 tall, 4 survivors, target 3)
 
 ```
 ##############################
-#........#..........#.......X#
+#........#..!.......#......PX#
 #..S.....#........?.#........#
 #........#.....F....C........#
 #........#.....F....C........#
-#........#...?......#........#
+#........#..?.......#........#
 ####R#####..........#........#
 #........#..........######.###
-#........#..........#........#
-#...................#....?...#
-#........#..........#........#
-#.?......#####.######........#
-#........#..........#........#
+#.....?..#.......?..#........#
+#...................#........#
+#..?.....#..........#........#
+#........#####.######........#
+#.....?..#..........#........#
 #........#..........###.######
-#........#......?...#........#
 #........#..........#........#
-#..M.E.D............#.....?..#
+#........#..........#........#
+#...................#........#
 #........#...................#
 #........#..........#........#
 ##############################
 ```
 
 **What this level teaches** (positions are `row,col`, counting from 0):
+- **You start beside the exit** (top right).
+- **The quake changes your route back.** The quickest way between the burning central hall and the exit room is the cracked gap at `3,20` and `4,20`. When the first aftershock hits, the gap becomes rubble.
+- **Two clusters:** the central hall (the critical survivor at `1,12` and spots `2,18`, `5,12`, `8,17`) and the west rooms (spots `8,6`, `10,3`, `12,6`).
 - **The Engineer matters.** The storeroom in the top left (survivor at `2,3`) has only one door, and it is Rubble (`6,4`).
-- **The quake changes your route.** The fastest way from the burning central hall to the exit room is the cracked gap at `3,20` and `4,20`. When the first aftershock hits, the gap becomes rubble.
-- **Survivors:** the storeroom survivor (`S`) is always there. The other two are picked from six `?` spots: the central hall next to the fire (`5,13`), the top of the hall (`2,18`), the lower hall (`14,16`), the west room (`11,2`), and the east wing (`9,25`, `16,26`).
-
-- The storeroom survivor can't be reached at all until the Engineer clears `6,4`.
-- Every one of the 15 possible picks was checked with a route script. The slowest pick needs about 27 s of pure movement to rescue the target of 2. Each survivor lasts 60 s.
+- The 2 random survivors are one minor and one serious.
 
 **Every level follows the same rules.** Each level must have:
+- the team start (`P`) next to the exit,
 - at least one cracked-floor shortcut, plus a longer backup route,
-- at least one fixed survivor (`S`) that only the Engineer can reach,
+- at least one fixed survivor (`S`) that only the Engineer can reach, and one fixed critical survivor (`!`),
 - at least one survivor in a side room that is easy to miss without the Dog Handler, and
 - every survivor still reachable after every cracked tile has collapsed (counting rubble as clearable).
 
 ### Level 2 (35 × 25, 4 survivors, target 3): "Office floor"
 
 The map is in `assets/levels/level2.txt`.
-- **The shortcut:** a central corridor runs from the start straight to the exit, but a 3 × 3 block of cracked floor sits across its middle.
+- **The start:** beside the exit at the east end of the central corridor.
+- **The shortcut:** a 3 × 3 block of cracked floor sits across the middle of the central corridor, between the start and the west half of the building.
 - **After the quake:** the backup route climbs through the north-west room into the north corridor, then comes back down east of the crack.
-- **The Engineer:** the north-east room's only door is rubble.
-- **Side rooms:** the two south-side rooms are reached through other rooms, and a fire sits right next to the south-east survivor.
-
-Start to exit is 29 tiles with the shortcut and 51 without it.
-
-**Survivors:** the north-east room's survivor is fixed; 3 more are picked from 6 spots (the north-west and north rooms, the west rooms, the south-east room, and the south room behind rubble).
+- **The Engineer:** the north-east room's only door is rubble, right next to the start.
+- **Survivors:** the north-east room's serious survivor and a critical survivor in the south-middle room (`17,13`) are fixed; 3 more (minor, serious, minor) are picked from 6 spots in two clusters: the north rooms and the south-west rooms.
 
 ### Level 3 (40 × 30, 5 survivors, target 4): "Hospital wing"
 
 The map is in `assets/levels/level3.txt`.
-- **The shortcut:** the exit hall is at the top. The quickest way up from the ward is a two-tile cracked gap.
-- **After the quake:** the backup route goes round through the east room, nearly doubling the trip (32 tiles → 60).
+- **The start:** beside the exit at the top of the exit hall.
+- **The shortcut:** the quickest way down from the exit hall to the big hall is a two-tile cracked gap right below the start.
+- **After the quake:** the backup route goes round through the east room, nearly doubling the trip.
 - **The Engineer:** the west room is behind rubble. More rubble doors connect the start room to the side wings as shortcuts.
 - **Pressure:** this level has four fires and the fastest aftershocks (every 27 s).
-- **Survivors:** the west room's survivor is fixed; 4 more are picked from 7 spots across the wings, the big hall and the ward rooms.
+- **Survivors:** the west room's serious survivor and a critical survivor in the big hall (`13,9`) are fixed; 4 more (minor, serious, minor, serious) are picked from 7 spots across the big hall, the ward and the south-west room.
 
-All three levels were checked with a route script against **every possible pick** of survivor spots (15, 20 and 35 picks): every spot can be reached, also after the quake, and every rule above holds. For the slowest pick it estimates about 27 s, 44 s and 52 s of movement to rescue the target number, against 60, 75 and 90 s of survivor time.
+**Checked by a test, not by hand.** `LevelBalanceTest` checks every level against **every possible pick** of survivor spots and **every way the random types can land** on them (1, 15, 20 and 35 picks). It assumes every cracked floor has already collapsed and fire never burns out. It plans the best order a player could rescue the target in, letting the player walk on while backup comes, and requires the plan to fit in 80 % of each survivor's time. The worst picks currently use 32 %, 60 %, 74 % and 46 % (training, Levels 1, 2, 3). A second test checks that fire reaches no survivor spot in the first 40 s, which is exact because fire follows the level's seed until the first aftershock warning.
 
 ---
 
@@ -294,9 +333,9 @@ All three levels were checked with a route script against **every possible pick*
 
 ### Screens
 
-1. **Main Menu:** title, Start, How to Play, Quit. Menu music plays.
-2. **How to Play:** the rescuers, the tiles (with pictures), fog, aftershocks, and the controls.
-3. **Game Screen:** the camera view on the left, the HUD panel on the right, and the minimap in the top-right corner of the camera view.
+1. **Main Menu:** title, Start Game (begins with the training level), Skip Training (straight to Level 1), How to Play, Quit. Menu music plays.
+2. **How to Play:** four columns: the controls, the three roles, the four survivor types, and the building's tiles, each with its picture.
+3. **Game Screen:** the camera view on the left, the HUD panel on the right. On the camera view: the objective checklist top left, the minimap bottom right (it used to cover the exit at the top right), and in training a prompt card near the bottom.
 4. **Pause overlay** (Esc): Resume, Restart Level, Main Menu.
 5. **Result Screen:** Success or Failure, survivors rescued, score breakdown, and buttons for Next Level, Retry, and Main Menu.
 
@@ -312,11 +351,18 @@ All three levels were checked with a route script against **every possible pick*
 ### Camera view and minimap
 
 - The camera view is **15 × 11 tiles** (960 × 704 px), centred on the active rescuer and clamped at the map edges.
-- The **minimap** draws the whole map at 4 px per tile:
+- The **minimap** (bottom-right corner) draws the whole map at 4 px per tile:
   - explored tiles in their colour, unexplored tiles black,
   - the Exit in green,
-  - all three rescuers as coloured dots (the active one larger),
+  - the rescuer as a dot in their role's colour,
   - revealed survivors as blinking dots.
+
+### Objective checklist (added 2026-11-15)
+
+A small card in the top-left corner of the map, like a quest tracker in other games. It has three lines with a box each (filled = done): **Find survivors 2/4**, **Rescue 1/3**, **Leave by the EXIT**. Under them is one **next step** line in the accent colour, worked out by `ObjectiveTracker`:
+- while carrying or leading someone, "Take them to the EXIT";
+- otherwise, what the nearest revealed survivor needs, which each survivor type answers itself (`getNeed()`), for example "Critical! Medic (1): face them, press E";
+- if nobody is revealed, "Follow the HELP calls", or "Search the dark. Dog Handler (3): press E".
 
 ### HUD contents
 
@@ -325,9 +371,9 @@ Reworked 2026-11-09 after the first playtest. Research on game HUDs pointed the 
 - **Top:** level number and elapsed time on one line.
 - **AFTERSHOCK:** a bar that empties as the quake gets closer, with the seconds left. Both turn orange in the last 5 s.
 - **SURVIVORS:** one box per survivor. A saved survivor fills a box with their picture, and a lost one is a red cross. Boxes for the survivors you must save are solid, the optional ones are dashed. Under them: "Save 1 more", then "Leave by the EXIT" in the accent colour.
-- **TEAM:** number key, picture, name and health pips for each rescuer. The active one's number is in the accent colour; a downed one says "down" in red.
-- **ABILITY:** the E keycap, the ability name, and a bar that refills while it recharges.
-- **Carrying:** the carried survivor with their condition bar, shown only while carrying.
+- **TEAM (1 2 3 to change):** number key, picture, name and health pips for each role. The one on the map has its number in the accent colour; a downed one says "down" in red. A small bar over the rescuer on the map fills during the 1 s gear change.
+- **ABILITY:** the E keycap, the ability name, and a bar that refills while it recharges. Under it, the Q keycap: "Call backup (critical)".
+- **Carrying / Following you:** the carried survivor and the follower with their condition bars, each shown only when there is one.
 - **Messages** about things that just happened (an invalid action, someone burning, a survivor lost) appear for 3 s in a small box at the bottom of the map, not in the sidebar. Nothing the sidebar already shows is repeated there.
 
 ### Controls
@@ -335,8 +381,9 @@ Reworked 2026-11-09 after the first playtest. Research on game HUDs pointed the 
 | Input | Action |
 |---|---|
 | WASD / arrow keys | Walk (hold to keep walking). Also turns to face that direction |
-| 1, 2, 3 or Tab | Switch to Medic / Engineer / Dog Handler, or cycle to the next |
+| 1, 2, 3 or Tab | Change role to Medic / Engineer / Dog Handler, or to the next one (1 s gear change) |
 | E | Special action on the faced tile (the Dog Handler needs no target) |
+| Q | Call backup for a stabilised critical survivor on your tile or the tile you face |
 | Esc | Pause |
 
 **Why E (changed from Space on 2026-11-09):** in PC games Q and E are the usual ability keys, and Space usually means jump or dash. Genshin Impact is the closest match to our design: a team switched with the number keys, and E for the active character's skill.
@@ -371,10 +418,13 @@ core/                                              (the whole game, no desktop c
       SurvivorPip.java      (new: one survivor box in the HUD, implements Drawable)
       CarriedSurvivor.java  (new: draws the carried survivor in the HUD, implements Drawable)
       Toast.java            (new: a short message over the map that fades out)
+      ObjectivePanel.java   (v4: the objective checklist card on the map)
     graphics/
       Painter.java          (new: draws images and shapes for every Drawable)
     model/
-      GameBoard.java, Survivor.java, Drawable.java, GameState.java, Direction.java
+      GameBoard.java, RescueTeam.java, Survivor.java, Drawable.java, GameState.java, Direction.java
+      survivors/
+        MinorSurvivor.java, SeriousSurvivor.java, CriticalSurvivor.java
       tiles/
         Tile.java, Floor.java, CrackedFloor.java, BurntFloor.java,
         Wall.java, Rubble.java, Fire.java, Exit.java
@@ -389,6 +439,8 @@ core/                                              (the whole game, no desktop c
       LevelData.java
       ScoreKeeper.java
       InvalidMoveException.java
+      ObjectiveTracker.java, Objective.java   (v4: the objective checklist)
+      Tutorial.java         (v4: the training level's prompts)
     assets/
       AssetManager.java
       SoundManager.java
@@ -397,7 +449,7 @@ lwjgl3/                                            (desktop launcher)
   build.gradle
   src/main/java/rescuegrid/Main.java               (opens the window)
 assets/                                            (shared by both modules)
-  levels/  level1.txt, level2.txt, level3.txt
+  levels/  tutorial.txt, level1.txt, level2.txt, level3.txt
   sounds/  music/  images/  fonts/
 tools/
   SoundMaker.java           (our own synthesizer: generates every WAV, not part of the game)
@@ -447,7 +499,9 @@ These classes and their roles were promised in our proposal. Keep the names.
   - `void startCooldown()`
   - `void takeDamage(int amount)`, `boolean isDowned()`
   - `double getStepDelay()`: 0.15 normally, 0.30 when carrying
-  - `pickUp(Survivor s)`, `Survivor dropSurvivor()`, `Survivor deliverSurvivor()`
+  - `pickUp(Survivor s)`, `lead(Survivor s)`, `Survivor dropSurvivor()`, `Survivor deliverSurvivor()`, `int deliverAll()` (carried + follower)
+  - `void takeOver(Rescuer previous)`: used when changing role; copies the position, facing and step in progress, and takes over the carried survivor and the follower
+  - `Survivor findSurvivorNearby(GameBoard board)` (own tile, else the faced tile) and `String callBackup(GameBoard board)`: the Q key, the same for every role
   - `moveTo(int row, int col)` and `moveTo(Tile target)`: this is the overloading example
   - `Tile getFacedTile(GameBoard board)`
   - `double getDrawRow()` and `getDrawCol()`: where to draw the rescuer mid-step. This gives smooth sliding, for example 5.5 halfway between rows 5 and 6.
@@ -467,16 +521,26 @@ These classes and their roles were promised in our proposal. Keep the names.
 
 ### Model classes
 
+**`RescueTeam`** (v4, decision 0007)
+- Holds the three roles in key order, which one is on the map, and the gear-change timer.
+- `switchTo(int index)` and `switchToNext()` throw `InvalidMoveException` for a downed role or the role already on the map; `replaceDowned()` sends in the next role when the one on the map is downed; `isWipedOut()`.
+- `tick(seconds)` counts down every role's cooldown and the gear change.
+
 **`GameBoard`**
 - Holds:
-  - `Tile[][] grid`, `ArrayList<Rescuer> rescuers`, `ArrayList<Survivor> survivors`
+  - `Tile[][] grid`, a `RescueTeam team`, `ArrayList<Survivor> survivors`
   - `boolean[][] visible`, recalculated whenever the active rescuer moves or switches, or the world ticks
-- Methods: `getTile(row, col)`, `replaceTile(row, col, Tile t)`, `inBounds(row, col)`, `getRescuerAt(row, col)`, `getSurvivorAt(row, col)`, `isVisible(row, col)`
+- Methods: `getTile(row, col)`, `replaceTile(row, col, Tile t)`, `inBounds(row, col)`, `getActiveRescuer()`, `getTeam()`, `getRescuerAt(row, col)` (only the rescuer on the map), `getSurvivorAt(row, col)`, `isVisible(row, col)`
 - `replaceTile` is how fire spreads, fire burns out, rubble is cleared, and cracked floor collapses. Swap the tile object for a new subclass object, and copy the `explored` flag to the new tile. Do not use a type field.
 
-**`Survivor`**
-- Private fields: `row`, `col`, `condition`, `revealed`, `carried`, `rescued`, `lost`
-- Methods: `tickCondition()`, `heal(int amount)`, `reveal()`, plus getters
+**`Survivor`** (abstract since v4, implements `Drawable`, decision 0008)
+- Private fields: `row`, `col`, `condition`, `revealed`, `carried`, `following`, `trapped`, `rescued`, `lost`
+- Abstract methods: `getInjuryName()`, `getTagColor()`, `getConditionLossPerTick()`, `goWith(Rescuer r)` (follow, be carried, or refuse), `whatTheyNeed()`
+- Methods every type shares: `reachedBy(Rescuer r)` (refuses while trapped, then calls `goWith`), `treat(int amount)`, `callBackup()` (throws "only critical survivors need backup"), `update(double seconds)` (does nothing), `tickCondition()`, `freeFromDebris()`, `getNeed()`, `reveal()`, plus getters
+- Subclasses (package `model.survivors`):
+  - `MinorSurvivor`: `goWith` makes them follow; drains 1 point a tick.
+  - `SeriousSurvivor`: `goWith` picks them up; drains 2.
+  - `CriticalSurvivor`: `goWith` always refuses with what they need; overrides `treat` (also stabilises), `callBackup` (starts the 10 s countdown), `update` (counts it down and rescues them), `getConditionLossPerTick` (3, or 1 once stabilised), and `drawFigure` (lying down).
 
 **`GameState`** (enum): `MENU`, `PLAYING`, `PAUSED`, `LEVEL_COMPLETE`, `GAME_OVER`
 
@@ -493,6 +557,7 @@ These classes and their roles were promised in our proposal. Keep the names.
 - **`TurnManager`**
   - Adds up the elapsed time.
   - Runs the world tick (Section 4.2) every 3 s, in the exact order listed there.
+  - Every frame: lets each survivor `update(seconds)` (the backup countdown), works out which survivors are calling for help (`getCallingSurvivors()`), and sends in the next role if the one on the map was downed.
   - Tracks elapsed time and the aftershock countdown for the HUD.
 - **`HazardManager`**: fire damage, fire spread, aftershocks. Uses one `java.util.Random` created with a seed per level, so bugs can be reproduced.
 - **`GameEvent`**: a small class with a `Type` enum (`RESCUER_HURT`, `AFTERSHOCK`, ...) and a message.
@@ -504,6 +569,8 @@ These classes and their roles were promised in our proposal. Keep the names.
   - Picks which `?` spots get a survivor (shuffle, then take as many as needed).
 - **`LevelData`**: per-level settings (file name, survivor count, target, aftershock ticks, survivor condition, random seed).
 - **`ScoreKeeper`**: calculates the score from Section 4.7.
+- **`ObjectiveTracker`** and **`Objective`** (v4): the objective checklist and the "next step" line (Section 6).
+- **`Tutorial`** (v4): the training level's prompts. Remembers what the player has done (steps walked, rubble cleared, treated, backup called, scent used) and moves past every step that is done.
 - **`InvalidMoveException`**: custom checked exception, thrown by special actions that can't happen (on cooldown, no valid target). The UI catches it and shows the message in the HUD.
 
 ### UI classes
@@ -526,6 +593,7 @@ These classes and their roles were promised in our proposal. Keep the names.
   - Worked example: the view is 15 tiles wide (960 px) and the rescuer is at col 20. Then `offsetX = 20 × 64 − (960 − 64) / 2 = 832`, and a tile at col 25 appears at screen `x = 25 × 64 − 832 = 768`.
 - **`Minimap`** (implements `Drawable`): loops over the whole grid and draws a 4 px square per explored tile, then dots for the exit, rescuers and revealed survivors.
 - **`KeyboardInput`** (extends libGDX `InputAdapter`): keeps the keys currently held down in a `HashSet<Integer>`. `isHeld(int keycode)` lets `update()` ask "is W held?" every frame, which is what makes hold-to-walk work.
+- **`ObjectivePanel`** (extends Scene2D `Table`, v4): the objective checklist card.
 - **`HudPanel`** (extends Scene2D `Table`): shows the information from Section 6. **`HealthBar`** (extends Scene2D `Actor`) draws the health squares. The timer bars are Scene2D's own `ProgressBar`. **`SurvivorPip`** and **`CarriedSurvivor`** implement `Drawable`, so the HUD draws them in icon slots like any tile.
 - **`Toast`** (extends Scene2D `Label`): a message at the bottom of the map that fades out with Scene2D actions (`delay`, then `fadeOut`).
 - **`MenuPanel`**, **`HowToPlayPanel`**, **`ResultPanel`**: the other screens.
@@ -546,15 +614,15 @@ These classes and their roles were promised in our proposal. Keep the names.
 | Pillar | Where it lives |
 |---|---|
 | **Encapsulation** | `Rescuer` keeps `health`, `specialCooldown` and `moveTimer` private. They only change through `takeDamage()`, `startCooldown()` and `tick()`, so no other class can set invalid values. `Survivor` does the same with `condition`. |
-| **Inheritance** | `Medic`, `Engineer`, `DogHandler` extend `Rescuer`. `Floor`, `Wall`, `Rubble`, `Fire`, `Exit` extend `Tile`. `CrackedFloor` and `BurntFloor` extend `Floor` (two levels deep). |
-| **Polymorphism** | Pressing E calls `activeRescuer.specialAction(board)` and the right subclass version runs. The draw loop calls `tile.draw(...)` on every tile without checking its type, and each tile's own `drawFallback` paints bricks, rocks or flames. On an aftershock, `HazardManager` calls `tile.onAftershock(board)` on every tile: only `CrackedFloor` reacts. Fire burnout works the same way through `onWorldTick`. |
-| **Abstraction** | `Tile` and `Rescuer` are abstract with abstract methods. `GameBoard` and `MovementCalculator` work with any `Tile` without knowing which kind it is. |
+| **Inheritance** | `Medic`, `Engineer`, `DogHandler` extend `Rescuer`. `MinorSurvivor`, `SeriousSurvivor`, `CriticalSurvivor` extend `Survivor`. `Floor`, `Wall`, `Rubble`, `Fire`, `Exit` extend `Tile`. `CrackedFloor` and `BurntFloor` extend `Floor` (two levels deep). |
+| **Polymorphism** | Pressing E calls `activeRescuer.specialAction(board)` and the right subclass version runs. The draw loop calls `tile.draw(...)` on every tile without checking its type, and each tile's own `drawFallback` paints bricks, rocks or flames. On an aftershock, `HazardManager` calls `tile.onAftershock(board)` on every tile: only `CrackedFloor` reacts. Fire burnout works the same way through `onWorldTick`. Walking onto a survivor calls `survivor.reachedBy(rescuer)`: a minor survivor follows, a serious one is picked up, a critical one refuses and says what it needs. The Medic's `treat()` also stabilises a critical survivor, and only `CriticalSurvivor` accepts `callBackup()`. |
+| **Abstraction** | `Tile`, `Rescuer` and `Survivor` are abstract with abstract methods. `GameBoard` and `MovementCalculator` work with any `Tile` without knowing which kind it is. |
 
 **Using the library's classes the OOP way:** our screens inherit from libGDX (`GameFrame extends Game`, `BaseScreen extends ScreenAdapter`, and the four screens extend `BaseScreen`), `HudPanel extends Table`, `HealthBar extends Actor` and overrides `draw`, and `KeyboardInput extends InputAdapter`. libGDX then calls our overridden methods (`render`, `keyDown`, `draw`) without knowing our classes, which is polymorphism from the other side.
 
 Other concepts we want visible in the code:
 - An interface (`Drawable`, implemented by four unrelated classes; we also implement libGDX's `Disposable`)
-- Composition (`GameBoard` has a grid, rescuers have a carried survivor, `GamePanel` has a `Camera`, a `Minimap` and a `KeyboardInput`)
+- Composition (`GameBoard` has a grid and a `RescueTeam`, rescuers have a carried survivor and a follower, `GamePanel` has a `Camera`, a `Minimap` and a `KeyboardInput`)
 - Enums (`GameState`, `Direction`, `GameEvent.Type`)
 - Collections and generics (`ArrayList`, `HashMap`, `HashSet`, `List<Survivor>`)
 - A custom exception (`InvalidMoveException`)
@@ -563,7 +631,7 @@ Other concepts we want visible in the code:
 - `@Override` on every overridden method
 - Method overloading (`moveTo(int row, int col)` and `moveTo(Tile target)`; `LevelLoader.load(...)` and `LevelLoader.parse(...)` with different parameters)
 
-**Avoid:** long `instanceof` or `switch` chains to decide behaviour by type. If a behaviour depends on the type, it belongs in an overridden method in the subclass, like the hook methods on `Tile`. The only allowed switch on tile type is in `LevelLoader`.
+**Avoid:** long `instanceof` or `switch` chains to decide behaviour by type. If a behaviour depends on the type, it belongs in an overridden method in the subclass, like the hook methods on `Tile`. The only allowed switches on tile or survivor type are in `LevelLoader`. "Trapped" is a flag, not a subclass, because a survivor stops being trapped during play and an object can't change its class.
 
 ---
 
@@ -594,7 +662,9 @@ Other concepts we want visible in the code:
 | `medic` | Person in white with a red cross, red cap |
 | `engineer` | Person in an orange vest with a yellow hard hat |
 | `dog_handler` | Person in blue with a small brown dog beside them |
-| `survivor` | Person in a yellow shirt, one arm raised waving |
+| `survivor_minor` | Person in a green shirt, one arm raised waving |
+| `survivor_serious` | Person in a yellow shirt, one arm raised waving |
+| `survivor_critical` | Person in a red shirt, lying down |
 | `carry_icon` | Tiny survivor head in a yellow circle (shown on a rescuer who is carrying someone) |
 
 Palette: muted greys and browns for the building; strong single colours for people (red, orange, blue, yellow) so they pop against the floor. Facing directions (`medic_up` etc.) are an extra, only if time allows.
@@ -631,11 +701,12 @@ Our generated sounds and planned sprites are original, so there's nothing to lic
 
 Every milestone must compile and run. Build a thin working version first, then add to it.
 
-> **Status (2026-11-09):** Weeks 1–4 are built on libGDX, except the sprites:
-> - The whole game is playable, from the menu through all three levels, with placeholder art, sound and music.
-> - 31 JUnit tests cover the rules (`gradlew test`).
-> - Added after the first playtest: a survivor counter in the HUD, leaving through the exit once the target is reached, and random survivor spots.
-> - Still to do: the sprites (waiting for the go-ahead), playtesting, and tuning the numbers marked *(tune)*.
+> **Status (2026-11-15):** Weeks 1–4 are built on libGDX, except the sprites:
+> - The whole game is playable, from the menu through the training level and all three levels, with placeholder art, sound and music.
+> - 68 JUnit tests cover the rules (`gradlew test`), including a full play-through of the training and a balance check of every level.
+> - Added after the first playtest (2026-11-09): a survivor counter in the HUD, leaving through the exit once the target is reached, and random survivor spots.
+> - Added after the teacher's feedback (2026-11-15): one rescuer who changes role, triage survivor types with backup, trapped survivors, start at the exit with grouped survivors, calls for help, the objective checklist, and the training level.
+> - Still to do: the sprites (waiting for the go-ahead), playtesting the v4 changes, and tuning the numbers marked *(tune)*.
 
 ### Week 1: Walk around
 - Create all packages and class skeletons
@@ -702,7 +773,7 @@ Cut from the top first:
 **Never cut:**
 - the `Tile` and `Rescuer` hierarchies,
 - at least two rescuers with different special actions,
-- switching between rescuers,
+- changing role (the one rescuer with three roles),
 - the camera, fog and minimap,
 - the recursive flood fill,
 - aftershocks collapsing cracked floor,

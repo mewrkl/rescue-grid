@@ -105,8 +105,8 @@ class RescuerTest {
         assertTrue(survivor.isRescued());
         assertEquals(1, board.getRescuedCount());
 
-        // 100 per rescue + 20 per health point left (3 x 5) + no all-rescued bonus + (120 - 30) time bonus
-        assertEquals(100 + 15 * 20 + 0 + 90, new ScoreKeeper().calculateScore(board, 30));
+        // 100 per rescue + 20 per health point left (3 roles x 5) + no all-rescued bonus (no time bonus)
+        assertEquals(100 + 15 * 20, new ScoreKeeper().calculateScore(board));
     }
 
     @Test

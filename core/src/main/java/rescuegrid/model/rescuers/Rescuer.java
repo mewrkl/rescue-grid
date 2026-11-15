@@ -115,6 +115,22 @@ public abstract class Rescuer implements Drawable {
         }
     }
 
+    /**
+     * Takes over from the role that was on the map: same spot, same facing, the
+     * same step in progress, and whoever they were carrying.
+     */
+    public void takeOver(Rescuer previous) {
+        row = previous.row;
+        col = previous.col;
+        prevRow = previous.prevRow;
+        prevCol = previous.prevCol;
+        facing = previous.facing;
+        moveTimer = previous.moveTimer;
+        stepDuration = previous.stepDuration;
+        carriedSurvivor = previous.carriedSurvivor;
+        previous.carriedSurvivor = null;
+    }
+
     /** Moves onto the given tile. */
     public void moveTo(Tile target) {
         moveTo(target.getRow(), target.getCol());
@@ -146,7 +162,7 @@ public abstract class Rescuer implements Drawable {
     }
 
     /** 0.0 at the start of a step, 1.0 when it's finished. */
-    private double stepProgress() {
+    public double stepProgress() {
         if (stepDuration <= 0) {
             return 1.0;
         }

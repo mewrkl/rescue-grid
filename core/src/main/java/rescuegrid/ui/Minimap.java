@@ -11,7 +11,7 @@ import rescuegrid.model.rescuers.Rescuer;
 import rescuegrid.model.tiles.Tile;
 
 /**
- * The corner map: explored tiles, the exit, the rescuers and revealed
+ * The corner map: explored tiles, the exit, the rescuer and revealed
  * survivors. Here size means pixels per tile.
  */
 public class Minimap implements Drawable {
@@ -23,19 +23,13 @@ public class Minimap implements Drawable {
     private static final int BLINK_MILLIS = 400;
 
     private GameBoard board;
-    private Rescuer activeRescuer;
 
     public Minimap() {
         this.board = null;
-        this.activeRescuer = null;
     }
 
     public void setBoard(GameBoard board) {
         this.board = board;
-    }
-
-    public void setActiveRescuer(Rescuer activeRescuer) {
-        this.activeRescuer = activeRescuer;
     }
 
     @Override
@@ -70,18 +64,12 @@ public class Minimap implements Drawable {
             }
         }
 
-        // 3. Rescuers as dots in their own colour; the one you control is bigger.
-        for (Rescuer rescuer : board.getRescuers()) {
-            if (rescuer.isDowned()) {
-                continue;
-            }
-            float dot = rescuer == activeRescuer ? size * 2 : size + 2;
-            float centerX = x + rescuer.getCol() * size + size / 2;
-            float centerY = y + rescuer.getRow() * size + size / 2;
-            painter.fillOval(rescuer.getFallbackColor(), centerX - dot / 2, centerY - dot / 2, dot, dot);
-            if (rescuer == activeRescuer) {
-                painter.outlineOval(Color.WHITE, centerX - dot / 2, centerY - dot / 2, dot, dot, 1);
-            }
-        }
+        // 3. The rescuer on the map as a dot in their role's colour.
+        Rescuer rescuer = board.getActiveRescuer();
+        float dot = size * 2;
+        float centerX = x + rescuer.getCol() * size + size / 2;
+        float centerY = y + rescuer.getRow() * size + size / 2;
+        painter.fillOval(rescuer.getFallbackColor(), centerX - dot / 2, centerY - dot / 2, dot, dot);
+        painter.outlineOval(Color.WHITE, centerX - dot / 2, centerY - dot / 2, dot, dot, 1);
     }
 }

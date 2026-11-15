@@ -1,6 +1,6 @@
 # 0002: Control a team of three rescuers by switching, not one rescuer per level
 
-- Status: Accepted
+- Status: Superseded by 0007
 - Date: 2026-11-08
 - Source: team discussion after 0001 (real-time movement)
 

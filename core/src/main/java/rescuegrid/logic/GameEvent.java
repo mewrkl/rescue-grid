@@ -10,6 +10,7 @@ public class GameEvent {
     public enum Type {
         RESCUER_HURT,
         RESCUER_DOWNED,
+        ROLE_TAKEOVER,
         FIRE_SPREAD,
         SURVIVOR_LOST,
         AFTERSHOCK_WARNING,

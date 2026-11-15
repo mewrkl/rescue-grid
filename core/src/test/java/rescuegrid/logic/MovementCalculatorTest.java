@@ -18,24 +18,20 @@ class MovementCalculatorTest {
     /** A small room: walls around, a wall in the middle, rubble on the right. */
     private static final String[] ROOM = {
         "#########",
-        "#M..#..R#",
+        "#P..#..R#",
         "#...#...#",
-        "#E.D....#",
+        "#.......#",
         "#......X#",
         "#########",
     };
 
     @Test
-    void wallsAndRescuersBlockSteps() {
+    void wallsBlockSteps() {
         GameBoard board = loader.parse(ROOM);
-        Rescuer medic = board.getRescuers().get(0); // at (1,1)
+        Rescuer medic = board.getActiveRescuer(); // at (1,1)
         assertFalse(movement.canStep(board, medic, Direction.UP), "wall");
         assertFalse(movement.canStep(board, medic, Direction.LEFT), "wall");
         assertTrue(movement.canStep(board, medic, Direction.RIGHT), "floor");
-
-        Rescuer engineer = board.getRescuers().get(1); // at (3,1)
-        medic.moveTo(2, 1);
-        assertFalse(movement.canStep(board, engineer, Direction.UP), "another rescuer is standing there");
     }
 
     @Test

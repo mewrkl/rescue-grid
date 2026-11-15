@@ -33,7 +33,7 @@ class LevelLoaderTest {
     void symbolsBecomeTheRightTiles() {
         GameBoard board = loader.parse(new String[] {
             "#######",
-            "#MEDCR#",
+            "#P..CR#",
             "#SF..X#",
             "#######",
         });
@@ -48,7 +48,7 @@ class LevelLoaderTest {
     void openBorderIsRejected() {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> loader.parse(new String[] {
             "#####",
-            "#MEDX",
+            "#P..X",
             "#####",
         }));
         assertTrue(e.getMessage().contains("border"), e.getMessage());
@@ -58,7 +58,7 @@ class LevelLoaderTest {
     void missingExitIsRejected() {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> loader.parse(new String[] {
             "######",
-            "#MED.#",
+            "#P...#",
             "######",
         }));
         assertTrue(e.getMessage().contains("exit"), e.getMessage());
@@ -68,7 +68,7 @@ class LevelLoaderTest {
     void unevenRowsAreRejected() {
         assertThrows(IllegalArgumentException.class, () -> loader.parse(new String[] {
             "######",
-            "#MEDX#",
+            "#P..X#",
             "#####",
         }));
     }
@@ -77,7 +77,7 @@ class LevelLoaderTest {
     void unknownSymbolIsRejected() {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> loader.parse(new String[] {
             "#######",
-            "#MEDQX#",
+            "#P..QX#",
             "#######",
         }));
         assertTrue(e.getMessage().contains("'Q'"), e.getMessage());
@@ -116,7 +116,7 @@ class LevelLoaderTest {
     void tooFewSpotsIsRejected() {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> loader.parse(new String[] {
             "#######",
-            "#MEDSX#",
+            "#P..SX#",
             "#?....#",
             "#######",
         }, Survivor.DEFAULT_CONDITION, 3, new Random(0)));

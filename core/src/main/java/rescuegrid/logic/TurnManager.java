@@ -53,6 +53,11 @@ public class TurnManager {
             hazards.planCollapses(board);
             events.add(new GameEvent(GameEvent.Type.AFTERSHOCK_WARNING, ""));
         }
+        // If fire or a collapse downed the rescuer on the map, the next role takes over.
+        if (board.getTeam().replaceDowned()) {
+            events.add(new GameEvent(GameEvent.Type.ROLE_TAKEOVER,
+                    "The " + board.getActiveRescuer().getName() + " takes over"));
+        }
     }
 
     /** Everything that happens to the building once per tick, in this order. */
@@ -79,34 +84,18 @@ public class TurnManager {
             }
         }
         // A rescuer can't keep carrying someone who was lost.
-        for (Rescuer rescuer : board.getRescuers()) {
-            if (rescuer.isCarrying() && rescuer.getCarriedSurvivor().isLost()) {
-                rescuer.dropSurvivor();
-            }
+        Rescuer rescuer = board.getActiveRescuer();
+        if (rescuer.isCarrying() && rescuer.getCarriedSurvivor().isLost()) {
+            rescuer.dropSurvivor();
         }
     }
 
     /**
      * True when the team has left through the exit, no survivors are left in the
-     * building, or every rescuer is downed.
+     * building, or all three roles are downed.
      */
     public boolean isMissionOver() {
-        if (evacuated) {
-            return true;
-        }
-        boolean survivorsLeft = false;
-        for (Survivor survivor : board.getSurvivors()) {
-            if (!survivor.isRescued() && !survivor.isLost()) {
-                survivorsLeft = true;
-            }
-        }
-        boolean rescuersLeft = false;
-        for (Rescuer rescuer : board.getRescuers()) {
-            if (!rescuer.isDowned()) {
-                rescuersLeft = true;
-            }
-        }
-        return !survivorsLeft || !rescuersLeft;
+        return evacuated || board.getStillInsideCount() == 0 || board.getTeam().isWipedOut();
     }
 
     /** True when at least the level's target number of survivors were rescued. */

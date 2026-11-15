@@ -73,9 +73,7 @@ public class LevelLoader {
     public GameBoard parse(String[] rows, int survivorCondition, int survivorCount, Random random) {
         checkShape(rows);
         checkCount(rows, 'X', "exit (X)");
-        checkCount(rows, 'M', "Medic start (M)");
-        checkCount(rows, 'E', "Engineer start (E)");
-        checkCount(rows, 'D', "Dog Handler start (D)");
+        checkCount(rows, 'P', "team start (P)");
 
         GameBoard board = new GameBoard(rows.length, rows[0].length());
         for (int row = 0; row < rows.length; row++) {
@@ -120,9 +118,7 @@ public class LevelLoader {
                 break;
             case '.':
             case '?': // a possible survivor spot; pickSurvivorSpots() decides if someone is here
-            case 'M':
-            case 'E':
-            case 'D':
+            case 'P': // where the team starts, next to the exit
                 board.replaceTile(row, col, new Floor(row, col));
                 break;
             case 'C':
@@ -147,14 +143,15 @@ public class LevelLoader {
         }
     }
 
-    /** Adds the rescuers in a fixed order (Medic, Engineer, Dog Handler) so keys 1/2/3 always match. */
+    /**
+     * Adds the three roles at the start in a fixed order (Medic, Engineer, Dog Handler)
+     * so keys 1/2/3 always match. The Medic starts on the map.
+     */
     private void addRescuers(GameBoard board, String[] rows) {
-        int[] medic = findSymbol(rows, 'M');
-        int[] engineer = findSymbol(rows, 'E');
-        int[] dogHandler = findSymbol(rows, 'D');
-        board.addRescuer(new Medic(medic[0], medic[1]));
-        board.addRescuer(new Engineer(engineer[0], engineer[1]));
-        board.addRescuer(new DogHandler(dogHandler[0], dogHandler[1]));
+        int[] start = findSymbol(rows, 'P');
+        board.addRescuer(new Medic(start[0], start[1]));
+        board.addRescuer(new Engineer(start[0], start[1]));
+        board.addRescuer(new DogHandler(start[0], start[1]));
     }
 
     /** Every row the same length, and the outer border all walls. */

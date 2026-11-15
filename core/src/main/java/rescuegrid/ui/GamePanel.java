@@ -54,6 +54,7 @@ public class GamePanel extends BaseScreen {
     private static final Color REMEMBERED = Painter.rgba(0, 0, 0, 150);
     private static final Color FACED_TILE = Painter.rgba(255, 255, 255, 150);
     private static final Color PAUSE_SCRIM = Painter.rgba(0, 0, 0, 170);
+    private static final Color GEAR_BAR_BACK = Painter.rgba(0, 0, 0, 180);
     private static final double WARNING_PULSES_PER_SECOND = 1.5;
     private static final float EDGE_GLOW_WIDTH = 48;
     private static final float EDGE_GLOW_ALPHA = 0.22f;
@@ -75,7 +76,6 @@ public class GamePanel extends BaseScreen {
     private GameBoard board;
     private LevelData level;
     private TurnManager turns;
-    private Rescuer activeRescuer;
     private GameState state;
     private double shakeSecondsLeft;
     private int shakePixels;
@@ -128,16 +128,14 @@ public class GamePanel extends BaseScreen {
         level = LevelData.forLevel(levelNumber);
         board = loader.load(level, new Random()); // new Random(): survivors in different spots each time
         turns = new TurnManager(board, new HazardManager(level.getSeed()), level);
-        activeRescuer = board.getRescuers().get(0);
         minimap.setBoard(board);
-        minimap.setActiveRescuer(activeRescuer);
         keys.clear();
         shakeSecondsLeft = 0;
         pauseCard.setVisible(false);
-        movement.computeSight(board, activeRescuer);
-        camera.follow(activeRescuer.getRow(), activeRescuer.getCol(), board.getRows(), board.getCols());
+        movement.computeSight(board, active());
+        camera.follow(active().getRow(), active().getCol(), board.getRows(), board.getCols());
         toast.show("Save " + level.getTarget() + " of the " + level.getSurvivorCount() + " survivors");
-        hud.refresh(board, activeRescuer, turns, level);
+        hud.refresh(board, active(), turns, level);
 
         sounds.loopMusic("gameplay");
         state = GameState.PLAYING;
@@ -190,19 +188,14 @@ public class GamePanel extends BaseScreen {
 
         handleActionKeys();
         handleMovement();
-        for (Rescuer rescuer : board.getRescuers()) {
-            rescuer.tick(seconds);
-        }
-        turns.update(seconds);
+        board.getTeam().tick(seconds);
+        turns.update(seconds); // also sends in the next role if the one on the map was downed
         handleEvents(turns.takeEvents());
-        if (activeRescuer.isDowned()) {
-            switchToNext();
-        }
-        movement.computeSight(board, activeRescuer); // the map may have changed, so look again
+        movement.computeSight(board, active()); // the map may have changed, so look again
         shakeSecondsLeft = Math.max(0, shakeSecondsLeft - seconds);
 
-        camera.follow(activeRescuer.getDrawRow(), activeRescuer.getDrawCol(), board.getRows(), board.getCols());
-        hud.refresh(board, activeRescuer, turns, level);
+        camera.follow(active().getDrawRow(), active().getDrawCol(), board.getRows(), board.getCols());
+        hud.refresh(board, active(), turns, level);
         keys.endFrame();
 
         if (turns.isMissionOver()) {
@@ -210,28 +203,40 @@ public class GamePanel extends BaseScreen {
         }
     }
 
-    /** One-shot keys: switching rescuer and the special action. */
+    /** The rescuer on the map right now. */
+    private Rescuer active() {
+        return board.getActiveRescuer();
+    }
+
+    /** One-shot keys: changing role and the special action. */
     private void handleActionKeys() {
         if (keys.wasPressed(Input.Keys.NUM_1)) {
-            switchTo(0);
+            switchRole(0);
         } else if (keys.wasPressed(Input.Keys.NUM_2)) {
-            switchTo(1);
+            switchRole(1);
         } else if (keys.wasPressed(Input.Keys.NUM_3)) {
-            switchTo(2);
+            switchRole(2);
         } else if (keys.wasPressed(Input.Keys.TAB)) {
-            switchToNext();
+            switchRole(-1);
         }
 
         if (keys.wasPressed(Input.Keys.E)) {
             try {
+                checkNotChangingGear();
                 // Runs the Medic's, Engineer's or Dog Handler's own version.
-                String result = activeRescuer.specialAction(board);
-                sounds.play(activeRescuer.getSpecialSound());
+                String result = active().specialAction(board);
+                sounds.play(active().getSpecialSound());
                 toast.show(result);
             } catch (InvalidMoveException e) {
                 sounds.play("denied");
                 toast.show(e.getMessage());
             }
+        }
+    }
+
+    private void checkNotChangingGear() throws InvalidMoveException {
+        if (board.getTeam().isChangingGear()) {
+            throw new InvalidMoveException("Changing gear...");
         }
     }
 
@@ -241,12 +246,15 @@ public class GamePanel extends BaseScreen {
         if (direction == null) {
             return;
         }
-        activeRescuer.setFacing(direction); // turn even if the step is blocked
-        if (!activeRescuer.canStep() || !movement.canStep(board, activeRescuer, direction)) {
+        if (board.getTeam().isChangingGear()) {
+            return; // can't walk while putting on the new role's gear
+        }
+        Rescuer rescuer = active();
+        rescuer.setFacing(direction); // turn even if the step is blocked
+        if (!rescuer.canStep() || !movement.canStep(board, rescuer, direction)) {
             return;
         }
-        activeRescuer.moveTo(activeRescuer.getRow() + direction.getRowChange(),
-                activeRescuer.getCol() + direction.getColChange());
+        rescuer.moveTo(rescuer.getRow() + direction.getRowChange(), rescuer.getCol() + direction.getColChange());
         sounds.play("step");
         afterStep();
     }
@@ -273,11 +281,12 @@ public class GamePanel extends BaseScreen {
      * reached) leave the building. Anywhere else, pick up a survivor on this tile.
      */
     private void afterStep() {
-        int row = activeRescuer.getRow();
-        int col = activeRescuer.getCol();
+        Rescuer rescuer = active();
+        int row = rescuer.getRow();
+        int col = rescuer.getCol();
         Tile here = board.getTile(row, col);
-        if (here.isExit() && activeRescuer.isCarrying()) {
-            activeRescuer.deliverSurvivor();
+        if (here.isExit() && rescuer.isCarrying()) {
+            rescuer.deliverSurvivor();
             sounds.play("rescued");
             if (turns.isTargetReached() && board.getStillInsideCount() > 0) {
                 toast.show("Step off and back on to leave");
@@ -291,49 +300,30 @@ public class GamePanel extends BaseScreen {
             }
             return;
         }
-        if (!activeRescuer.isCarrying()) {
+        if (!rescuer.isCarrying()) {
             Survivor survivor = board.getSurvivorAt(row, col);
             if (survivor != null) {
                 survivor.reveal();
-                activeRescuer.pickUp(survivor);
+                rescuer.pickUp(survivor);
                 sounds.play("pickup");
             }
         }
     }
 
-    private void switchTo(int index) {
-        Rescuer chosen = board.getRescuers().get(index);
-        if (chosen == activeRescuer) {
-            return;
-        }
-        if (chosen.isDowned()) {
-            sounds.play("denied");
-            toast.show(chosen.getName() + " is down");
-            return;
-        }
-        setActive(chosen);
-    }
-
-    /** Switches to the next rescuer in the list who is still standing. */
-    private void switchToNext() {
-        List<Rescuer> team = board.getRescuers();
-        int current = team.indexOf(activeRescuer);
-        for (int step = 1; step <= team.size(); step++) {
-            Rescuer candidate = team.get((current + step) % team.size());
-            if (!candidate.isDowned()) {
-                if (candidate != activeRescuer) {
-                    setActive(candidate);
-                }
-                return;
+    /** Changes the role on the map (index 0/1/2, or -1 for the next one). */
+    private void switchRole(int index) {
+        try {
+            if (index < 0) {
+                board.getTeam().switchToNext();
+            } else {
+                board.getTeam().switchTo(index);
             }
+            sounds.play("switch");
+            toast.show("Changing to the " + active().getName());
+        } catch (InvalidMoveException e) {
+            sounds.play("denied");
+            toast.show(e.getMessage());
         }
-    }
-
-    private void setActive(Rescuer rescuer) {
-        activeRescuer = rescuer;
-        minimap.setActiveRescuer(rescuer);
-        movement.computeSight(board, rescuer);
-        sounds.play("switch");
     }
 
     private void togglePause() {
@@ -364,6 +354,9 @@ public class GamePanel extends BaseScreen {
                     break;
                 case RESCUER_DOWNED:
                     sounds.play("downed");
+                    break;
+                case ROLE_TAKEOVER:
+                    sounds.play("switch");
                     break;
                 case FIRE_SPREAD:
                     sounds.play("fire_spread");
@@ -418,7 +411,7 @@ public class GamePanel extends BaseScreen {
         drawFog();
         drawSurvivors();
         drawFacedTile();
-        drawRescuers();
+        drawRescuer();
         painter.end();
     }
 
@@ -516,7 +509,7 @@ public class GamePanel extends BaseScreen {
 
     /** A dashed outline on the tile the active rescuer faces: that's where E acts. */
     private void drawFacedTile() {
-        Tile faced = activeRescuer.getFacedTile(board);
+        Tile faced = active().getFacedTile(board);
         if (faced == null || state != GameState.PLAYING) {
             return;
         }
@@ -524,17 +517,20 @@ public class GamePanel extends BaseScreen {
                 TILE_SIZE - 6, TILE_SIZE - 6, 2, 6);
     }
 
-    private void drawRescuers() {
-        for (Rescuer rescuer : board.getRescuers()) {
-            if (rescuer.isDowned() || !camera.isInView(rescuer.getDrawRow(), rescuer.getDrawCol())) {
-                continue;
-            }
-            float x = camera.toMapX(rescuer.getDrawCol());
-            float y = camera.toMapY(rescuer.getDrawRow());
-            if (rescuer == activeRescuer) {
-                painter.outlineRect(Color.WHITE, x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4, 2);
-            }
-            rescuer.draw(painter, x, y, TILE_SIZE, assets);
+    /** The one rescuer on the map, with a bar above them while they change gear. */
+    private void drawRescuer() {
+        Rescuer rescuer = active();
+        if (rescuer.isDowned()) {
+            return;
+        }
+        float x = camera.toMapX(rescuer.getDrawCol());
+        float y = camera.toMapY(rescuer.getDrawRow());
+        rescuer.draw(painter, x, y, TILE_SIZE, assets);
+        if (board.getTeam().isChangingGear()) {
+            float width = TILE_SIZE - 12;
+            float progress = (float) board.getTeam().getGearChangeProgress();
+            painter.fillRect(GEAR_BAR_BACK, x + 6, y - 10, width, 6);
+            painter.fillRect(UiStyle.TEXT, x + 6, y - 10, width * progress, 6);
         }
     }
 }

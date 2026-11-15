@@ -8,17 +8,17 @@ import java.util.List;
 import rescuegrid.model.rescuers.Rescuer;
 import rescuegrid.model.tiles.Tile;
 
-/** The building: a grid of tiles plus the rescuers and survivors in it. */
+/** The building: a grid of tiles plus the rescue team and the survivors in it. */
 public class GameBoard {
 
     private final Tile[][] grid;
-    private final ArrayList<Rescuer> rescuers;
+    private final RescueTeam team;
     private final ArrayList<Survivor> survivors;
     private final boolean[][] visible;
 
     public GameBoard(int rows, int cols) {
         this.grid = new Tile[rows][cols];
-        this.rescuers = new ArrayList<>();
+        this.team = new RescueTeam();
         this.survivors = new ArrayList<>();
         this.visible = new boolean[rows][cols];
     }
@@ -55,8 +55,18 @@ public class GameBoard {
         grid[row][col] = newTile;
     }
 
+    /** Adds a role to the team. The first one added is the one on the map. */
     public void addRescuer(Rescuer rescuer) {
-        rescuers.add(rescuer);
+        team.add(rescuer);
+    }
+
+    public RescueTeam getTeam() {
+        return team;
+    }
+
+    /** The rescuer on the map right now. */
+    public Rescuer getActiveRescuer() {
+        return team.getActive();
     }
 
     public void addSurvivor(Survivor survivor) {
@@ -64,11 +74,11 @@ public class GameBoard {
     }
 
     /**
-     * Read-only view of the rescuers. Other classes can loop over it, but they
-     * can't add or remove rescuers behind the board's back (encapsulation).
+     * Read-only view of all three roles (only one is on the map). Other classes
+     * can loop over it, but can't add or remove rescuers behind the board's back.
      */
     public List<Rescuer> getRescuers() {
-        return Collections.unmodifiableList(rescuers);
+        return team.getMembers();
     }
 
     public List<Survivor> getSurvivors() {
@@ -100,12 +110,11 @@ public class GameBoard {
         return survivors.size() - getRescuedCount() - getLostCount();
     }
 
-    /** The active (not downed) rescuer standing at (row, col), or null. */
+    /** The rescuer on the map, if they are standing at (row, col); otherwise null. */
     public Rescuer getRescuerAt(int row, int col) {
-        for (Rescuer rescuer : rescuers) {
-            if (!rescuer.isDowned() && rescuer.getRow() == row && rescuer.getCol() == col) {
-                return rescuer;
-            }
+        Rescuer active = team.getActive();
+        if (!active.isDowned() && active.getRow() == row && active.getCol() == col) {
+            return active;
         }
         return null;
     }

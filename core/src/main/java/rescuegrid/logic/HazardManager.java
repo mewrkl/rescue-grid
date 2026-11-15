@@ -32,12 +32,11 @@ public class HazardManager {
         this.plannedCollapses = new ArrayList<>();
     }
 
-    /** Step 1 of the tick: every active rescuer next to fire loses 1 health. */
+    /** Step 1 of the tick: the rescuer on the map loses 1 health if they stand next to fire. */
     public void applyFireDamage(GameBoard board, List<GameEvent> events) {
-        for (Rescuer rescuer : board.getRescuers()) {
-            if (!rescuer.isDowned() && isNextToFire(board, rescuer.getRow(), rescuer.getCol())) {
-                hurt(rescuer, 1, rescuer.getName() + " is burning", events);
-            }
+        Rescuer rescuer = board.getActiveRescuer();
+        if (!rescuer.isDowned() && isNextToFire(board, rescuer.getRow(), rescuer.getCol())) {
+            hurt(rescuer, 1, rescuer.getName() + " is burning", events);
         }
     }
 
@@ -141,20 +140,18 @@ public class HazardManager {
         // 3. Anyone standing on a tile that just collapsed is pushed to a free neighbour.
         pushPeopleOffRubble(board, events);
 
-        // 4. Everyone still standing takes 1 damage.
-        for (Rescuer rescuer : board.getRescuers()) {
-            if (!rescuer.isDowned()) {
-                hurt(rescuer, 1, "", events);
-            }
+        // 4. The rescuer on the map takes 1 damage.
+        Rescuer rescuer = board.getActiveRescuer();
+        if (!rescuer.isDowned()) {
+            hurt(rescuer, 1, "", events);
         }
         events.add(new GameEvent(GameEvent.Type.AFTERSHOCK, ""));
     }
 
-    /** Damages a rescuer. If that downs them, they drop whoever they were carrying. */
+    /** Damages a rescuer. If that downs them, TurnManager sends in the next role. */
     private void hurt(Rescuer rescuer, int amount, String message, List<GameEvent> events) {
         rescuer.takeDamage(amount);
         if (rescuer.isDowned()) {
-            rescuer.dropSurvivor();
             events.add(new GameEvent(GameEvent.Type.RESCUER_DOWNED, rescuer.getName() + " is down"));
         } else {
             events.add(new GameEvent(GameEvent.Type.RESCUER_HURT, message));
@@ -162,10 +159,8 @@ public class HazardManager {
     }
 
     private void pushPeopleOffRubble(GameBoard board, List<GameEvent> events) {
-        for (Rescuer rescuer : board.getRescuers()) {
-            if (rescuer.isDowned() || board.getTile(rescuer.getRow(), rescuer.getCol()).isWalkable()) {
-                continue;
-            }
+        Rescuer rescuer = board.getActiveRescuer();
+        if (!rescuer.isDowned() && !board.getTile(rescuer.getRow(), rescuer.getCol()).isWalkable()) {
             Tile free = findFreeNeighbour(board, rescuer.getRow(), rescuer.getCol());
             if (free != null) {
                 rescuer.moveTo(free);

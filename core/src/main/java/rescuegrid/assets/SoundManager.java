@@ -18,7 +18,7 @@ public class SoundManager implements Disposable {
     private static final String[] SOUND_KEYS = {
         "click", "switch", "step", "denied", "bark", "clear_rubble", "heal", "pickup", "rescued",
         "fire_spread", "aftershock_warning", "aftershock", "hurt", "downed", "survivor_lost",
-        "success", "failure"
+        "success", "failure", "radio", "help_call"
     };
 
     private final HashMap<String, Sound> sounds;

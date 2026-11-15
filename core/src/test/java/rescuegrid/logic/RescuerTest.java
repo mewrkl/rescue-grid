@@ -12,12 +12,12 @@ import org.junit.jupiter.api.Test;
 import rescuegrid.model.Direction;
 import rescuegrid.model.GameBoard;
 import rescuegrid.model.Survivor;
+import rescuegrid.model.rescuers.Medic;
 import rescuegrid.model.rescuers.Rescuer;
 
 /**
  * The three specials, carrying and delivering, on the real Level 1 map.
- * Level 1 starts the Medic at (16,3), the Engineer at (16,5), the Dog Handler at
- * (16,7); the storeroom survivor at (2,3) is behind the rubble door at (6,4).
+ * The storeroom survivor at (2,3) is behind the rubble door at (6,4).
  */
 class RescuerTest {
 
@@ -85,7 +85,7 @@ class RescuerTest {
         medic.moveTo(5, 12);
         medic.setFacing(Direction.RIGHT);
         medic.specialAction(board);
-        assertEquals(Math.min(survivor.getMaxCondition(), before + 8), survivor.getCondition());
+        assertEquals(Math.min(survivor.getMaxCondition(), before + Medic.HEAL_AMOUNT), survivor.getCondition());
     }
 
     @Test

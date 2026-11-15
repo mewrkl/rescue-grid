@@ -5,11 +5,13 @@ import com.badlogic.gdx.graphics.Color;
 import rescuegrid.graphics.Painter;
 import rescuegrid.logic.InvalidMoveException;
 import rescuegrid.model.GameBoard;
+import rescuegrid.model.Survivor;
 import rescuegrid.model.tiles.Floor;
 import rescuegrid.model.tiles.Tile;
 
 /**
- * The Engineer clears rubble, reopening paths that aftershocks have blocked.
+ * The Engineer clears rubble, reopening paths that aftershocks have blocked,
+ * and lifts debris off trapped survivors.
  */
 public class Engineer extends Rescuer {
 
@@ -27,12 +29,18 @@ public class Engineer extends Rescuer {
             throw new InvalidMoveException("Clear Rubble is recharging");
         }
         Tile target = getFacedTile(board);
-        if (target == null || !target.isClearable()) {
-            throw new InvalidMoveException("Face rubble to clear it");
+        if (target != null && target.isClearable()) {
+            board.replaceTile(target.getRow(), target.getCol(), new Floor(target.getRow(), target.getCol()));
+            startCooldown();
+            return "Rubble cleared";
         }
-        board.replaceTile(target.getRow(), target.getCol(), new Floor(target.getRow(), target.getCol()));
-        startCooldown();
-        return "Rubble cleared";
+        Survivor survivor = findSurvivorNearby(board);
+        if (survivor != null && survivor.isTrapped()) {
+            survivor.freeFromDebris();
+            startCooldown();
+            return "Debris lifted. They can be moved now";
+        }
+        throw new InvalidMoveException("Face rubble or a trapped survivor");
     }
 
     @Override

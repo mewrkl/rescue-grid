@@ -6,15 +6,15 @@ import rescuegrid.graphics.Painter;
 import rescuegrid.logic.InvalidMoveException;
 import rescuegrid.model.GameBoard;
 import rescuegrid.model.Survivor;
-import rescuegrid.model.tiles.Tile;
 
 /**
- * The Medic treats survivors, buying them more time before they are lost.
- * She can treat the survivor she is carrying, or one lying on the tile she faces.
+ * The Medic treats survivors, buying them more time before they are lost, and
+ * stabilises critical survivors so backup can fetch them. She treats the survivor
+ * she is carrying or leading, or one lying on her tile or the tile she faces.
  */
 public class Medic extends Rescuer {
 
-    public static final int HEAL_AMOUNT = 8; // world ticks of condition
+    public static final int HEAL_AMOUNT = 8 * Survivor.POINTS_PER_TICK; // 8 world ticks of a serious survivor
 
     private static final Color COLOR = Painter.rgb(220, 38, 38);
 
@@ -29,17 +29,17 @@ public class Medic extends Rescuer {
         }
         Survivor patient = getCarriedSurvivor();
         if (patient == null) {
-            Tile faced = getFacedTile(board);
-            if (faced != null) {
-                patient = board.getSurvivorAt(faced.getRow(), faced.getCol());
-            }
+            patient = getFollower();
+        }
+        if (patient == null) {
+            patient = findSurvivorNearby(board);
         }
         if (patient == null) {
             throw new InvalidMoveException("Face or carry a survivor to treat");
         }
-        patient.heal(HEAL_AMOUNT);
+        String result = patient.treat(HEAL_AMOUNT); // a critical survivor is also stabilised
         startCooldown();
-        return "Survivor treated";
+        return result;
     }
 
     @Override

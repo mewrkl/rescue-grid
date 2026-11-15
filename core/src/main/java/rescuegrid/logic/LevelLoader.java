@@ -15,6 +15,9 @@ import rescuegrid.model.Survivor;
 import rescuegrid.model.rescuers.DogHandler;
 import rescuegrid.model.rescuers.Engineer;
 import rescuegrid.model.rescuers.Medic;
+import rescuegrid.model.survivors.CriticalSurvivor;
+import rescuegrid.model.survivors.MinorSurvivor;
+import rescuegrid.model.survivors.SeriousSurvivor;
 import rescuegrid.model.tiles.CrackedFloor;
 import rescuegrid.model.tiles.Exit;
 import rescuegrid.model.tiles.Fire;
@@ -24,16 +27,17 @@ import rescuegrid.model.tiles.Wall;
 
 /**
  * Reads a level text file (readLines) and turns it into a GameBoard (parse).
- * 'S' is a survivor who is always there; '?' is a possible spot, and enough of
- * them are picked at random to reach the level's survivor count.
- * This is the only switch on tile types in the game.
+ * Survivors who are always there: 'm' minor, 'S' serious, '!' critical,
+ * 'T' serious and trapped under debris. '?' is a possible spot: the level's
+ * random survivors (their types come from LevelData) go to shuffled '?' spots.
+ * This is the only switch on tile and survivor types in the game.
  */
 public class LevelLoader {
 
     /** Loads the map file named in the level's settings; random picks which '?' spots get a survivor. */
     public GameBoard load(LevelData level, Random random) {
         return parse(readLines(level.getFileName()), level.getSurvivorCondition(),
-                level.getSurvivorCount(), random);
+                level.getRandomSurvivorTypes(), random);
     }
 
     /** Same, but always the same survivor spots (from the level's seed). Used by the tests. */
@@ -64,13 +68,16 @@ public class LevelLoader {
         return lines.toArray(new String[0]);
     }
 
-    /** Builds a board with default survivors and only the fixed 'S' ones. Used by tests. */
+    /** Builds a board with default survivor time and only the fixed survivors. Used by tests. */
     public GameBoard parse(String[] rows) {
-        return parse(rows, Survivor.DEFAULT_CONDITION, countSymbol(rows, 'S'), new Random(0));
+        return parse(rows, Survivor.DEFAULT_CONDITION, "", new Random(0));
     }
 
-    /** Builds a board from rows of characters. Throws a clear error if the map is broken. */
-    public GameBoard parse(String[] rows, int survivorCondition, int survivorCount, Random random) {
+    /**
+     * Builds a board from rows of characters. randomTypes has one letter per random
+     * survivor ('m', 's' or '!'). Throws a clear error if the map is broken.
+     */
+    public GameBoard parse(String[] rows, int survivorCondition, String randomTypes, Random random) {
         checkShape(rows);
         checkCount(rows, 'X', "exit (X)");
         checkCount(rows, 'P', "team start (P)");
@@ -81,18 +88,17 @@ public class LevelLoader {
                 placeTile(board, rows[row].charAt(col), row, col, survivorCondition);
             }
         }
-        for (int[] spot : pickSurvivorSpots(rows, survivorCount, random)) {
-            board.addSurvivor(new Survivor(spot[0], spot[1], survivorCondition));
+        List<int[]> spots = pickSurvivorSpots(rows, randomTypes.length(), random);
+        for (int i = 0; i < spots.size(); i++) {
+            int[] spot = spots.get(i);
+            board.addSurvivor(createSurvivor(randomTypes.charAt(i), spot[0], spot[1], survivorCondition));
         }
         addRescuers(board, rows);
         return board;
     }
 
-    /**
-     * Chooses which '?' spots get a survivor: shuffle all the spots, then take
-     * as many from the front as we still need after the fixed 'S' survivors.
-     */
-    private List<int[]> pickSurvivorSpots(String[] rows, int survivorCount, Random random) {
+    /** Chooses which '?' spots get a survivor: shuffle all the spots, then take as many as needed. */
+    private List<int[]> pickSurvivorSpots(String[] rows, int needed, Random random) {
         List<int[]> spots = new ArrayList<>();
         for (int row = 0; row < rows.length; row++) {
             for (int col = 0; col < rows[row].length(); col++) {
@@ -101,10 +107,9 @@ public class LevelLoader {
                 }
             }
         }
-        int needed = survivorCount - countSymbol(rows, 'S');
-        if (needed < 0 || needed > spots.size()) {
-            throw new IllegalArgumentException("Level needs " + survivorCount + " survivors, but has "
-                    + countSymbol(rows, 'S') + " fixed (S) and " + spots.size() + " possible spots (?)");
+        if (needed > spots.size()) {
+            throw new IllegalArgumentException("Level needs " + needed + " random survivors, but has only "
+                    + spots.size() + " possible spots (?)");
         }
         Collections.shuffle(spots, random);
         return spots.subList(0, needed);
@@ -133,13 +138,35 @@ public class LevelLoader {
             case 'X':
                 board.replaceTile(row, col, new Exit(row, col));
                 break;
-            case 'S':
+            case 'S': // a survivor who is always here
+            case 'm':
+            case '!':
                 board.replaceTile(row, col, new Floor(row, col));
-                board.addSurvivor(new Survivor(row, col, survivorCondition));
+                board.addSurvivor(createSurvivor(symbol == 'S' ? 's' : symbol, row, col, survivorCondition));
+                break;
+            case 'T': // a serious survivor trapped under debris
+                board.replaceTile(row, col, new Floor(row, col));
+                Survivor trapped = createSurvivor('s', row, col, survivorCondition);
+                trapped.setTrapped(true);
+                board.addSurvivor(trapped);
                 break;
             default:
                 throw new IllegalArgumentException("Unknown symbol '" + symbol
                         + "' at row " + row + ", col " + col);
+        }
+    }
+
+    /** Creates the right Survivor subclass for a type letter: 'm' minor, 's' serious, '!' critical. */
+    private Survivor createSurvivor(char type, int row, int col, int survivorCondition) {
+        switch (type) {
+            case 'm':
+                return new MinorSurvivor(row, col, survivorCondition);
+            case 's':
+                return new SeriousSurvivor(row, col, survivorCondition);
+            case '!':
+                return new CriticalSurvivor(row, col, survivorCondition);
+            default:
+                throw new IllegalArgumentException("Unknown survivor type '" + type + "' (use m, s or !)");
         }
     }
 

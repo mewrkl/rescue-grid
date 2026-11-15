@@ -220,6 +220,17 @@ public class GamePanel extends BaseScreen {
             switchRole(-1);
         }
 
+        if (keys.wasPressed(Input.Keys.Q)) {
+            try {
+                checkNotChangingGear();
+                toast.show(active().callBackup(board));
+                sounds.play("radio");
+            } catch (InvalidMoveException e) {
+                sounds.play("denied");
+                toast.show(e.getMessage());
+            }
+        }
+
         if (keys.wasPressed(Input.Keys.E)) {
             try {
                 checkNotChangingGear();
@@ -285,8 +296,8 @@ public class GamePanel extends BaseScreen {
         int row = rescuer.getRow();
         int col = rescuer.getCol();
         Tile here = board.getTile(row, col);
-        if (here.isExit() && rescuer.isCarrying()) {
-            rescuer.deliverSurvivor();
+        if (here.isExit() && (rescuer.isCarrying() || rescuer.isLeading())) {
+            rescuer.deliverAll();
             sounds.play("rescued");
             if (turns.isTargetReached() && board.getStillInsideCount() > 0) {
                 toast.show("Step off and back on to leave");
@@ -300,12 +311,14 @@ public class GamePanel extends BaseScreen {
             }
             return;
         }
-        if (!rescuer.isCarrying()) {
-            Survivor survivor = board.getSurvivorAt(row, col);
-            if (survivor != null) {
-                survivor.reveal();
-                rescuer.pickUp(survivor);
+        Survivor survivor = board.getSurvivorAt(row, col);
+        if (survivor != null) {
+            survivor.reveal();
+            try {
+                survivor.reachedBy(rescuer); // follows, is picked up, or says what they need
                 sounds.play("pickup");
+            } catch (InvalidMoveException e) {
+                toast.show(e.getMessage());
             }
         }
     }
@@ -363,6 +376,9 @@ public class GamePanel extends BaseScreen {
                     break;
                 case SURVIVOR_LOST:
                     sounds.play("survivor_lost");
+                    break;
+                case BACKUP_ARRIVED:
+                    sounds.play("rescued");
                     break;
                 case AFTERSHOCK_WARNING:
                     sounds.play("aftershock_warning");
@@ -496,7 +512,7 @@ public class GamePanel extends BaseScreen {
         }
     }
 
-    /** Survivors only appear once revealed (seen, or found by the dog). */
+    /** Survivors only appear once revealed (seen, or found by the dog), plus the one following you. */
     private void drawSurvivors() {
         for (Survivor survivor : board.getSurvivors()) {
             if (survivor.isWaiting() && survivor.isRevealed()
@@ -504,6 +520,12 @@ public class GamePanel extends BaseScreen {
                 survivor.draw(painter, camera.toMapX(survivor.getCol()), camera.toMapY(survivor.getRow()),
                         TILE_SIZE, assets);
             }
+        }
+        Survivor follower = active().getFollower();
+        if (follower != null) {
+            double progress = active().stepProgress(); // slides along with the rescuer
+            follower.draw(painter, camera.toMapX(follower.getDrawCol(progress)),
+                    camera.toMapY(follower.getDrawRow(progress)), TILE_SIZE, assets);
         }
     }
 

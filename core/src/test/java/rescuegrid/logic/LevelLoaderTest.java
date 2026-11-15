@@ -119,7 +119,7 @@ class LevelLoaderTest {
             "#P..SX#",
             "#?....#",
             "#######",
-        }, Survivor.DEFAULT_CONDITION, 3, new Random(0)));
+        }, Survivor.DEFAULT_CONDITION, "ss", new Random(0)));
         assertTrue(e.getMessage().contains("possible spots"), e.getMessage());
     }
 }

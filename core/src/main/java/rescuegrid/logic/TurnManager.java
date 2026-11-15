@@ -43,6 +43,7 @@ public class TurnManager {
     public void update(double seconds) {
         elapsedSeconds += seconds;
         secondsSinceTick += seconds;
+        updateSurvivors(seconds);
         // "while", not "if": if the game ever lags by more than one tick, we catch up.
         while (secondsSinceTick >= TICK_SECONDS) {
             secondsSinceTick -= TICK_SECONDS;
@@ -75,6 +76,17 @@ public class TurnManager {
         // 6. The end check happens in isMissionOver(), which GamePanel asks every frame.
     }
 
+    /** Every frame: lets each survivor count down (backup for critical survivors). */
+    private void updateSurvivors(double seconds) {
+        for (Survivor survivor : board.getSurvivors()) {
+            boolean wasRescued = survivor.isRescued();
+            survivor.update(seconds);
+            if (!wasRescued && survivor.isRescued()) {
+                events.add(new GameEvent(GameEvent.Type.BACKUP_ARRIVED, "Backup carried a survivor out"));
+            }
+        }
+    }
+
     private void tickSurvivors() {
         for (Survivor survivor : board.getSurvivors()) {
             boolean wasLost = survivor.isLost();
@@ -83,10 +95,13 @@ public class TurnManager {
                 events.add(new GameEvent(GameEvent.Type.SURVIVOR_LOST, "A survivor didn't make it"));
             }
         }
-        // A rescuer can't keep carrying someone who was lost.
+        // A rescuer can't keep carrying or leading someone who was lost.
         Rescuer rescuer = board.getActiveRescuer();
         if (rescuer.isCarrying() && rescuer.getCarriedSurvivor().isLost()) {
             rescuer.dropSurvivor();
+        }
+        if (rescuer.isLeading() && rescuer.getFollower().isLost()) {
+            rescuer.releaseFollower();
         }
     }
 

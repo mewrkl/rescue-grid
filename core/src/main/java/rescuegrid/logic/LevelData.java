@@ -14,16 +14,18 @@ public class LevelData {
     private final int target;
     private final int aftershockTicks;
     private final int survivorCondition;
+    private final String randomSurvivorTypes;
     private final long seed;
 
     private LevelData(int number, String fileName, int survivorCount, int target, int aftershockTicks,
-                      int survivorCondition, long seed) {
+                      int survivorCondition, String randomSurvivorTypes, long seed) {
         this.number = number;
         this.fileName = fileName;
         this.survivorCount = survivorCount;
         this.target = target;
         this.aftershockTicks = aftershockTicks;
         this.survivorCondition = survivorCondition;
+        this.randomSurvivorTypes = randomSurvivorTypes;
         this.seed = seed;
     }
 
@@ -34,11 +36,11 @@ public class LevelData {
     public static LevelData forLevel(int number) {
         switch (number) {
             case 1:
-                return new LevelData(1, "/levels/level1.txt", 3, 2, 15, 20, 1001L);
+                return new LevelData(1, "/levels/level1.txt", 3, 2, 15, 20, "ms", 1001L);
             case 2:
-                return new LevelData(2, "/levels/level2.txt", 4, 3, 12, 25, 2002L);
+                return new LevelData(2, "/levels/level2.txt", 4, 3, 12, 25, "msm", 2002L);
             case 3:
-                return new LevelData(3, "/levels/level3.txt", 5, 4, 9, 30, 3003L);
+                return new LevelData(3, "/levels/level3.txt", 5, 4, 9, 30, "msms", 3003L);
             default:
                 throw new IllegalArgumentException("There is no level " + number);
         }
@@ -73,6 +75,11 @@ public class LevelData {
     /** How many world ticks a survivor lasts before being lost (without healing). */
     public int getSurvivorCondition() {
         return survivorCondition;
+    }
+
+    /** One letter per random survivor: 'm' minor, 's' serious, '!' critical. */
+    public String getRandomSurvivorTypes() {
+        return randomSurvivorTypes;
     }
 
     public long getSeed() {

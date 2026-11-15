@@ -84,6 +84,11 @@ public class SoundMaker {
         // ----- Music -----
         save(music, "menu", menuMusic(), 0.5);
         save(music, "gameplay", gameplayMusic(), 0.45);
+        // Added 2026-11-15, after the music so the earlier sounds stay exactly the same.
+        save(sounds, "radio", concat(tone(Wave.NOISE, 3000, 2000, 0.06, 0.4), tone(Wave.SQUARE, 1200, 1200, 0.05, 1),
+                silence(0.03), tone(Wave.SQUARE, 1500, 1500, 0.08, 1)), 0.3);
+        save(sounds, "help_call", concat(tone(Wave.TRIANGLE, 700, 900, 0.12, 1), silence(0.05),
+                tone(Wave.TRIANGLE, 900, 650, 0.2, 1)), 0.22);
         System.out.println("Done. Files written to assets/sounds and assets/music.");
     }
 

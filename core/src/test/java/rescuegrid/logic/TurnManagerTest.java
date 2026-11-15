@@ -12,6 +12,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import rescuegrid.model.GameBoard;
+import rescuegrid.model.Survivor;
 
 /**
  * Runs each level's world tick for up to 5 minutes with nobody moving, the same
@@ -71,8 +72,8 @@ class TurnManagerTest {
 
         assertTrue(turns.isMissionOver(), "survivors run out of time");
         assertFalse(turns.isSuccess());
-        // Survivors last survivorCondition ticks, so the mission ends at exactly that time.
-        assertEquals(level.getSurvivorCondition() * TurnManager.TICK_SECONDS, turns.getElapsedSeconds(), 0.1);
+        // The mission ends when the longest-lasting survivor runs out (fire can only make it sooner).
+        assertTrue(turns.getElapsedSeconds() <= longestLife(level) * TurnManager.TICK_SECONDS + 0.1);
 
         int burnt = 0;
         for (int row = 0; row < board.getRows(); row++) {
@@ -132,6 +133,16 @@ class TurnManagerTest {
             boolean burning = board.getTile(tile[0], tile[1]).isBurning();
             assertTrue(collapsed || burning, "marked tile (" + tile[0] + "," + tile[1] + ") became rubble");
         }
+    }
+
+    /** World ticks until the slowest-draining survivor in the level is lost, if nobody helps. */
+    private static int longestLife(LevelData level) {
+        int longest = 0;
+        for (Survivor survivor : new LevelLoader().load(level).getSurvivors()) {
+            int loss = survivor.getConditionLossPerTick();
+            longest = Math.max(longest, (survivor.getMaxCondition() + loss - 1) / loss);
+        }
+        return longest;
     }
 
     private static List<int[]> markedTiles(GameBoard board, TurnManager turns) {

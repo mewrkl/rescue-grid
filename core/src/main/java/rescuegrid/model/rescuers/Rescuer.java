@@ -35,6 +35,7 @@ public abstract class Rescuer implements Drawable {
     private int prevCol;
     private int health;
     private Survivor carriedSurvivor;
+    private Survivor follower;      // a minor survivor walking one tile behind
     private Direction facing;
     private double specialCooldown; // seconds until the special can be used again
     private double moveTimer;       // seconds until the next step is allowed
@@ -48,6 +49,7 @@ public abstract class Rescuer implements Drawable {
         this.prevCol = col;
         this.health = MAX_HEALTH;
         this.carriedSurvivor = null;
+        this.follower = null;
         this.facing = Direction.DOWN;
         this.specialCooldown = 0;
         this.moveTimer = 0;
@@ -113,6 +115,9 @@ public abstract class Rescuer implements Drawable {
         if (carriedSurvivor != null) {
             carriedSurvivor.moveTo(row, col);
         }
+        if (follower != null) {
+            follower.moveTo(prevRow, prevCol); // steps into the tile we just left
+        }
     }
 
     /**
@@ -128,7 +133,9 @@ public abstract class Rescuer implements Drawable {
         moveTimer = previous.moveTimer;
         stepDuration = previous.stepDuration;
         carriedSurvivor = previous.carriedSurvivor;
+        follower = previous.follower;
         previous.carriedSurvivor = null;
+        previous.follower = null;
     }
 
     /** Moves onto the given tile. */
@@ -187,6 +194,62 @@ public abstract class Rescuer implements Drawable {
         survivor.moveTo(row, col);
     }
 
+    /** A minor survivor starts walking behind this rescuer. */
+    public void lead(Survivor survivor) {
+        if (follower != null) {
+            return;
+        }
+        follower = survivor;
+        survivor.markFollowing();
+    }
+
+    /** The follower stops following (they were lost), and is returned (or null). */
+    public Survivor releaseFollower() {
+        Survivor released = follower;
+        if (released != null) {
+            released.markDropped(released.getRow(), released.getCol());
+            follower = null;
+        }
+        return released;
+    }
+
+    /** At the Exit: hands over the carried survivor and the follower. Returns how many were saved. */
+    public int deliverAll() {
+        int saved = 0;
+        if (deliverSurvivor() != null) {
+            saved++;
+        }
+        if (follower != null) {
+            follower.markRescued();
+            follower = null;
+            saved++;
+        }
+        return saved;
+    }
+
+    /**
+     * The survivor lying on this rescuer's tile, or else on the tile they face
+     * (null if neither). Used to treat, free or call backup for someone.
+     */
+    public Survivor findSurvivorNearby(GameBoard board) {
+        Survivor here = board.getSurvivorAt(row, col);
+        if (here != null) {
+            return here;
+        }
+        Tile faced = getFacedTile(board);
+        return faced == null ? null : board.getSurvivorAt(faced.getRow(), faced.getCol());
+    }
+
+    /** Any role can radio for backup (Q) for a stabilised critical survivor nearby. */
+    public String callBackup(GameBoard board) throws InvalidMoveException {
+        Survivor survivor = findSurvivorNearby(board);
+        if (survivor == null) {
+            throw new InvalidMoveException("Stand on or face a critical survivor to call backup");
+        }
+        survivor.callBackup(); // each survivor type decides if it needs backup
+        return "Backup is on the way. You can keep searching";
+    }
+
     /** Puts the carried survivor down on this tile and returns them (or null). */
     public Survivor dropSurvivor() {
         Survivor dropped = carriedSurvivor;
@@ -209,6 +272,14 @@ public abstract class Rescuer implements Drawable {
 
     public boolean isCarrying() {
         return carriedSurvivor != null;
+    }
+
+    public boolean isLeading() {
+        return follower != null;
+    }
+
+    public Survivor getFollower() {
+        return follower;
     }
 
     public int getRow() {

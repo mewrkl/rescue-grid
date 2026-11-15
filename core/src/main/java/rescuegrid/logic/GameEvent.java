@@ -13,6 +13,7 @@ public class GameEvent {
         ROLE_TAKEOVER,
         FIRE_SPREAD,
         SURVIVOR_LOST,
+        BACKUP_ARRIVED,
         AFTERSHOCK_WARNING,
         AFTERSHOCK
     }

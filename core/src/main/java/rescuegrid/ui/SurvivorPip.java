@@ -6,6 +6,7 @@ import rescuegrid.assets.AssetManager;
 import rescuegrid.graphics.Painter;
 import rescuegrid.model.Drawable;
 import rescuegrid.model.Survivor;
+import rescuegrid.model.survivors.SeriousSurvivor;
 
 /**
  * One slot in the HUD's survivor row. A saved survivor shows their picture,
@@ -19,7 +20,7 @@ class SurvivorPip implements Drawable {
     private static final Color NEEDED_BOX = Painter.rgba(255, 255, 255, 110);
     private static final Color OPTIONAL_BOX = Painter.rgba(255, 255, 255, 60);
 
-    private final Survivor picture = new Survivor(0, 0, Survivor.DEFAULT_CONDITION);
+    private final Survivor picture = new SeriousSurvivor(0, 0, Survivor.DEFAULT_CONDITION);
     private State state = State.INSIDE;
     private boolean needed = true;
 

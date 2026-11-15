@@ -7,6 +7,7 @@ import com.badlogic.gdx.utils.Align;
 
 import rescuegrid.model.Drawable;
 import rescuegrid.model.Survivor;
+import rescuegrid.model.survivors.SeriousSurvivor;
 import rescuegrid.model.rescuers.DogHandler;
 import rescuegrid.model.rescuers.Engineer;
 import rescuegrid.model.rescuers.Medic;
@@ -82,7 +83,7 @@ public class HowToPlayPanel extends BaseScreen {
 
     private Table buildingColumn() {
         Table column = heading("THE BUILDING");
-        iconRow(column, new Survivor(0, 0, Survivor.DEFAULT_CONDITION), "Survivor",
+        iconRow(column, new SeriousSurvivor(0, 0, Survivor.DEFAULT_CONDITION), "Survivor",
                 "Walk onto them to pick them up.");
         iconRow(column, new Exit(0, 0), "Exit", "Carry survivors here to save them.");
         iconRow(column, new Fire(0, 0), "Fire", "Spreads and burns anyone next to it.");

@@ -106,6 +106,26 @@ class RescuerTest {
         assertEquals(1, board.getRescuedCount());
     }
 
+    /** Bug found in play: leading a green survivor stopped the Medic treating a red one in front of them. */
+    @Test
+    void theMedicTreatsTheSurvivorInFrontEvenWhileLeadingSomeone() throws InvalidMoveException {
+        GameBoard small = new LevelLoader().parse(new String[] {
+            "#######",
+            "#XPm.!#",
+            "#.....#",
+            "#######",
+        });
+        Rescuer leader = small.getRescuers().get(0);
+        Survivor red = small.getSurvivorAt(1, 5);
+        leader.moveTo(1, 2);
+        small.getSurvivorAt(1, 3).reachedBy(leader);
+        assertTrue(leader.isLeading());
+        leader.moveTo(1, 4);
+        leader.setFacing(Direction.RIGHT);
+        assertEquals("Stabilised! Press Q to call backup", leader.specialAction(small));
+        assertTrue(red.canCallBackup(), "the red survivor, not the follower, was treated");
+    }
+
     @Test
     void healthNeverGoesBelowZero() {
         medic.takeDamage(Rescuer.MAX_HEALTH + 3);

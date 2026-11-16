@@ -39,12 +39,15 @@ public class Medic extends Rescuer {
         if (!canUseSpecial()) {
             throw new InvalidMoveException("Treat is recharging");
         }
-        Survivor patient = getCarriedSurvivor();
+        // The person you face (or stand on) comes first: someone following you must
+        // never stop you treating a red survivor in front of you. Otherwise Treat
+        // goes to the one you carry, then the one you lead.
+        Survivor patient = findSurvivorNearby(board);
         if (patient == null) {
-            patient = getFollower();
+            patient = getCarriedSurvivor();
         }
         if (patient == null) {
-            patient = findSurvivorNearby(board);
+            patient = getFollower();
         }
         if (patient == null) {
             Tile faced = getFacedTile(board);

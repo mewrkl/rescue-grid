@@ -41,6 +41,7 @@ public abstract class Rescuer implements Drawable {
     private double moveTimer;       // seconds until the next step is allowed
     private double stepDuration;    // how long the current step takes
     private double hurtFlash;       // seconds left of the red "ouch" flash
+    private int stepCount;          // steps taken, so the walk alternates left and right foot
 
     public Rescuer(int row, int col) {
         this.row = row;
@@ -99,6 +100,11 @@ public abstract class Rescuer implements Drawable {
         specialCooldown = getCooldownSeconds();
     }
 
+    /** A short recharge after a use that found nothing, so a miss doesn't cost the full wait. */
+    protected void startShortCooldown(double seconds) {
+        specialCooldown = Math.min(seconds, getCooldownSeconds());
+    }
+
     /** How long one step takes: slower while carrying someone. */
     public double getStepDelay() {
         return isCarrying() ? CARRY_STEP_DELAY : STEP_DELAY;
@@ -110,6 +116,7 @@ public abstract class Rescuer implements Drawable {
         prevCol = col;
         row = newRow;
         col = newCol;
+        stepCount++;
         stepDuration = getStepDelay();
         moveTimer = stepDuration;
         if (carriedSurvivor != null) {
@@ -130,6 +137,7 @@ public abstract class Rescuer implements Drawable {
         prevRow = previous.prevRow;
         prevCol = previous.prevCol;
         facing = previous.facing;
+        stepCount = previous.stepCount;
         moveTimer = previous.moveTimer;
         stepDuration = previous.stepDuration;
         carriedSurvivor = previous.carriedSurvivor;
@@ -152,6 +160,14 @@ public abstract class Rescuer implements Drawable {
     }
 
     /** The tile directly in front of the rescuer (null if off the map). */
+    /**
+     * The tiles this role's ability reaches, to show on the map (true = reached),
+     * or null if the ability only acts on the faced tile. Only the Dog Handler has one.
+     */
+    public boolean[][] getAbilityReach(GameBoard board) {
+        return null;
+    }
+
     public Tile getFacedTile(GameBoard board) {
         return board.getTile(row + facing.getRowChange(), col + facing.getColChange());
     }
@@ -240,6 +256,20 @@ public abstract class Rescuer implements Drawable {
         return faced == null ? null : board.getSurvivorAt(faced.getRow(), faced.getCol());
     }
 
+    /** True if Q would call backup right now: a stabilised critical survivor is here or faced. */
+    public boolean canCallBackup(GameBoard board) {
+        Survivor survivor = findSurvivorNearby(board);
+        return survivor != null && survivor.canCallBackup();
+    }
+
+    /**
+     * True if E has something to act on right now (the HUD dims the key when not).
+     * The Dog Handler can always sniff; the others override this.
+     */
+    public boolean hasSpecialTarget(GameBoard board) {
+        return true;
+    }
+
     /** Any role can radio for backup (Q) for a stabilised critical survivor nearby. */
     public String callBackup(GameBoard board) throws InvalidMoveException {
         Survivor survivor = findSurvivorNearby(board);
@@ -302,15 +332,50 @@ public abstract class Rescuer implements Drawable {
         return specialCooldown;
     }
 
-    /** Draws the rescuer image (or placeholder), then the carry badge and hurt flash. */
+    /**
+     * Draws the rescuer in a square, as in the HUD and menus: the sprite standing
+     * and facing us (narrower than it is tall, so it is centred), or the placeholder.
+     */
     @Override
     public void draw(Painter painter, float x, float y, float size, AssetManager assets) {
-        TextureRegion image = assets.getImage(getImageKey());
+        TextureRegion image = assets.getFrame(getImageKey(), Direction.DOWN.ordinal(), 0,
+                AssetManager.TILE_PIXELS, AssetManager.CHARACTER_PIXELS);
         if (image != null) {
-            painter.image(image, x, y, size, size);
+            float width = size * AssetManager.TILE_PIXELS / AssetManager.CHARACTER_PIXELS;
+            painter.image(image, x + (size - width) / 2, y, width, size);
         } else {
             drawFallback(painter, x, y, size);
         }
+        drawBadges(painter, x, y, size, assets);
+    }
+
+    /**
+     * Draws the rescuer on the map at their tile (x, y). The sprite is 1.5 tiles
+     * tall, so the head reaches into the tile above (the angled view). It faces
+     * the way they face and steps with alternate feet while moving.
+     */
+    public void drawOnMap(Painter painter, float x, float y, float size, AssetManager assets) {
+        TextureRegion image = assets.getFrame(getImageKey(), facing.ordinal(), getWalkFrame(),
+                AssetManager.TILE_PIXELS, AssetManager.CHARACTER_PIXELS);
+        if (image == null) {
+            draw(painter, x, y, size, assets);
+            return;
+        }
+        float height = size * AssetManager.CHARACTER_PIXELS / AssetManager.TILE_PIXELS;
+        painter.image(image, x, y + size - height, size, height);
+        drawBadges(painter, x, y + size - height, size, assets);
+    }
+
+    /** 0 standing, then 1 and 2 on alternate steps while a step is under way. */
+    protected int getWalkFrame() {
+        if (stepProgress() >= 1.0) {
+            return 0;
+        }
+        return 1 + stepCount % 2;
+    }
+
+    /** The carry badge (top right) and the red flash when hurt. */
+    private void drawBadges(Painter painter, float x, float y, float size, AssetManager assets) {
         if (isCarrying()) {
             drawCarryBadge(painter, x, y, size, assets);
         }

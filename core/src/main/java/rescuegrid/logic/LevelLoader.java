@@ -18,11 +18,15 @@ import rescuegrid.model.rescuers.Medic;
 import rescuegrid.model.survivors.CriticalSurvivor;
 import rescuegrid.model.survivors.MinorSurvivor;
 import rescuegrid.model.survivors.SeriousSurvivor;
+import rescuegrid.model.tiles.Barrier;
 import rescuegrid.model.tiles.CrackedFloor;
+import rescuegrid.model.tiles.DecoratedFloor;
 import rescuegrid.model.tiles.Exit;
 import rescuegrid.model.tiles.Fire;
 import rescuegrid.model.tiles.Floor;
+import rescuegrid.model.tiles.Prop;
 import rescuegrid.model.tiles.Rubble;
+import rescuegrid.model.tiles.TrainingDummy;
 import rescuegrid.model.tiles.Wall;
 
 /**
@@ -144,6 +148,14 @@ public class LevelLoader {
                 board.replaceTile(row, col, new Floor(row, col));
                 board.addSurvivor(createSurvivor(symbol == 'S' ? 's' : symbol, row, col, survivorCondition));
                 break;
+            case '1': // training doors: the Tutorial opens gate 1, 2 or 3 at the right step
+            case '2':
+            case '3':
+                board.replaceTile(row, col, new Barrier(row, col, symbol - '0'));
+                break;
+            case 'd': // training: a dummy the Medic practises on
+                board.replaceTile(row, col, new TrainingDummy(row, col));
+                break;
             case 'T': // a serious survivor trapped under debris
                 board.replaceTile(row, col, new Floor(row, col));
                 Survivor trapped = createSurvivor('s', row, col, survivorCondition);
@@ -151,9 +163,27 @@ public class LevelLoader {
                 board.addSurvivor(trapped);
                 break;
             default:
-                throw new IllegalArgumentException("Unknown symbol '" + symbol
-                        + "' at row " + row + ", col " + col);
+                placeFurniture(board, symbol, row, col);
+                break;
         }
+    }
+
+    /**
+     * Furniture (Prop) and things lying on the floor (DecoratedFloor) each have
+     * their own letter, listed in their enums. Anything else is a mistake in the file.
+     */
+    private void placeFurniture(GameBoard board, char symbol, int row, int col) {
+        Prop.Kind kind = Prop.Kind.forSymbol(symbol);
+        if (kind != null) {
+            board.replaceTile(row, col, new Prop(row, col, kind));
+            return;
+        }
+        DecoratedFloor.Decoration decoration = DecoratedFloor.Decoration.forSymbol(symbol);
+        if (decoration != null) {
+            board.replaceTile(row, col, new DecoratedFloor(row, col, decoration));
+            return;
+        }
+        throw new IllegalArgumentException("Unknown symbol '" + symbol + "' at row " + row + ", col " + col);
     }
 
     /** Creates the right Survivor subclass for a type letter: 'm' minor, 's' serious, '!' critical. */

@@ -1,12 +1,15 @@
 package rescuegrid.logic;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 import rescuegrid.model.Direction;
 import rescuegrid.model.GameBoard;
+import rescuegrid.model.Survivor;
 import rescuegrid.model.rescuers.Rescuer;
 
 /** One-tile steps and the recursive flood fill used for sight. */
@@ -32,6 +35,24 @@ class MovementCalculatorTest {
         assertFalse(movement.canStep(board, medic, Direction.UP), "wall");
         assertFalse(movement.canStep(board, medic, Direction.LEFT), "wall");
         assertTrue(movement.canStep(board, medic, Direction.RIGHT), "floor");
+    }
+
+    @Test
+    void aWaitingSurvivorIsInTheWayUntilTheyGoWithYou() throws InvalidMoveException {
+        GameBoard board = loader.parse(new String[] {
+            "######",
+            "#Pm.X#",
+            "######",
+        });
+        Rescuer medic = board.getActiveRescuer(); // at (1,1), the minor survivor at (1,2)
+        Survivor minor = board.getSurvivorAt(1, 2);
+        assertFalse(movement.canStep(board, medic, Direction.RIGHT), "you can't walk over them");
+        assertSame(minor, movement.survivorAhead(board, medic, Direction.RIGHT), "you walk into them");
+        assertNull(movement.survivorAhead(board, medic, Direction.DOWN));
+
+        minor.reachedBy(medic); // walking into them: they follow
+        assertTrue(movement.canStep(board, medic, Direction.RIGHT), "a follower doesn't block the way");
+        assertNull(movement.survivorAhead(board, medic, Direction.RIGHT));
     }
 
     @Test

@@ -48,6 +48,11 @@ public class CriticalSurvivor extends Survivor {
     }
 
     @Override
+    public boolean canCallBackup() {
+        return isWaiting() && !isTrapped() && stabilised && !isBackupComing();
+    }
+
+    @Override
     public void callBackup() throws InvalidMoveException {
         if (isTrapped()) {
             throw new InvalidMoveException("Free them from the debris first (Engineer, E)");
@@ -79,7 +84,7 @@ public class CriticalSurvivor extends Survivor {
             return null; // backup is handling it
         }
         if (!stabilised) {
-            return "Critical! Medic (1): face them, press E";
+            return "Too hurt to move. Medic (1): face them, press E";
         }
         return "Stabilised: face them, press Q for backup";
     }
@@ -99,14 +104,22 @@ public class CriticalSurvivor extends Survivor {
         return stabilised ? 1 : 3;
     }
 
+    /** Waiting for the Medic or for backup to be called. */
+    @Override
+    public boolean needsBackup() {
+        return !isBackupComing();
+    }
+
     public boolean isStabilised() {
         return stabilised;
     }
 
+    @Override
     public boolean isBackupComing() {
         return backupSecondsLeft > 0;
     }
 
+    @Override
     public double getBackupSecondsLeft() {
         return backupSecondsLeft;
     }
@@ -132,9 +145,6 @@ public class CriticalSurvivor extends Survivor {
             painter.fillRect(BADGE, bx, by, badge, badge);
             painter.fillRect(Color.WHITE, bx + badge * 0.4f, by + 2, badge * 0.2f, badge - 4);
             painter.fillRect(Color.WHITE, bx + 2, by + badge * 0.4f, badge - 4, badge * 0.2f);
-        }
-        if (isBackupComing()) {
-            painter.text((int) Math.ceil(backupSecondsLeft) + "s", Color.WHITE, x + size / 2, y + size / 8);
         }
     }
 }

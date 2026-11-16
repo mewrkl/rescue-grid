@@ -23,6 +23,8 @@ public abstract class Survivor implements Drawable {
     public static final int DEFAULT_CONDITION = 20; // world ticks a serious survivor lasts (60 s)
     /** Condition points per world tick of life, so types can drain at 1, 2 or 3 points a tick. */
     public static final int POINTS_PER_TICK = 2;
+    private static final long IDLE_FRAME_MILLIS = 600;
+    private static final long BUBBLE_FRAME_MILLIS = 350;
 
     private static final Color SKIN = Painter.rgb(232, 190, 150);
     private static final Color OUTLINE = Painter.rgb(40, 32, 24);
@@ -45,6 +47,7 @@ public abstract class Survivor implements Drawable {
     private boolean trapped;
     private boolean rescued;
     private boolean lost;
+    private int stepCount;
 
     /** ticksToLast: how many world ticks a serious survivor of this level would last. */
     public Survivor(int row, int col, int ticksToLast) {
@@ -85,7 +88,7 @@ public abstract class Survivor implements Drawable {
     /** What this survivor does when a rescuer reaches them (follow, be carried, or refuse). */
     protected abstract void goWith(Rescuer rescuer) throws InvalidMoveException;
 
-    /** A rescuer walked onto this survivor. Trapped survivors can't go anywhere yet. */
+    /** A rescuer walked into this survivor. Trapped survivors can't go anywhere yet. */
     public void reachedBy(Rescuer rescuer) throws InvalidMoveException {
         if (trapped) {
             throw new InvalidMoveException("Trapped under debris: the Engineer can lift it (E)");
@@ -97,6 +100,26 @@ public abstract class Survivor implements Drawable {
     public String treat(int amount) {
         condition = Math.min(maxCondition, condition + amount);
         return getInjuryName() + " survivor treated";
+    }
+
+    /** True for a survivor who can't be moved and needs backup called (only CriticalSurvivor). */
+    public boolean needsBackup() {
+        return false;
+    }
+
+    /** True while a stretcher team is on its way (only a CriticalSurvivor ever has one). */
+    public boolean isBackupComing() {
+        return false;
+    }
+
+    /** Seconds until the stretcher team reaches them (0 if none is coming). */
+    public double getBackupSecondsLeft() {
+        return 0;
+    }
+
+    /** True if pressing Q next to them would call backup now (only a ready CriticalSurvivor). */
+    public boolean canCallBackup() {
+        return false;
     }
 
     /** Someone radioed for backup to carry this survivor out. Only critical survivors need it. */
@@ -161,6 +184,7 @@ public abstract class Survivor implements Drawable {
         this.prevCol = this.col;
         this.row = row;
         this.col = col;
+        this.stepCount++;
     }
 
     public void markRescued() {
@@ -171,6 +195,20 @@ public abstract class Survivor implements Drawable {
 
     public void markLost() {
         lost = true;
+    }
+
+    /**
+     * Training only: puts a survivor who ran out of time back where they were
+     * hidden, at full condition and not yet found, so the timed part can be retried.
+     */
+    public void resetForRetry(int row, int col) {
+        carried = false;
+        following = false;
+        rescued = false;
+        lost = false;
+        revealed = false;
+        condition = maxCondition;
+        markDropped(row, col);
     }
 
     public int getRow() {
@@ -192,6 +230,15 @@ public abstract class Survivor implements Drawable {
 
     public int getCondition() {
         return condition;
+    }
+
+    /** World ticks until they are lost if nobody treats them (0 once rescued or lost). */
+    public int getTicksLeft() {
+        if (rescued || lost) {
+            return 0;
+        }
+        int loss = getConditionLossPerTick();
+        return (condition + loss - 1) / loss; // rounded up
     }
 
     public int getMaxCondition() {
@@ -227,19 +274,93 @@ public abstract class Survivor implements Drawable {
         return !carried && !following && !rescued && !lost;
     }
 
-    /** Draws the survivor (image or a simple figure), debris if trapped, and a condition bar. */
+    /**
+     * Draws the survivor in a square (the HUD and How to Play): their sprite as
+     * on the map, centred, or a simple figure with a triage tag. Then the debris
+     * if trapped, the extras and the condition bar.
+     */
     @Override
     public void draw(Painter painter, float x, float y, float size, AssetManager assets) {
-        TextureRegion image = assets.getImage(getImageKey());
+        TextureRegion image = getMapFrame(assets, false); // facing us, as on the map
         if (image != null) {
-            painter.image(image, x, y, size, size);
+            float width = size * AssetManager.TILE_PIXELS / AssetManager.CHARACTER_PIXELS;
+            painter.image(image, x + (size - width) / 2, y, width, size);
         } else {
             drawFigure(painter, x, y, size);
+            drawTag(painter, x, y, size);
         }
+        drawOverlays(painter, x, y, size);
+    }
+
+    /**
+     * Draws the survivor on the map at their tile (x, y), 1.5 tiles tall like the
+     * rescuers. moving is true while they walk behind the rescuer.
+     */
+    public void drawOnMap(Painter painter, float x, float y, float size, AssetManager assets, boolean moving) {
+        drawOnMap(painter, x, y, size, assets, moving, true);
+    }
+
+    /**
+     * As above; showBubble false leaves out the "!" bubble, for when the map
+     * already marks this survivor another way (one marker each, decision 0022).
+     */
+    public void drawOnMap(Painter painter, float x, float y, float size, AssetManager assets, boolean moving,
+                          boolean showBubble) {
+        TextureRegion image = getMapFrame(assets, moving);
+        if (image == null) {
+            draw(painter, x, y, size, assets);
+            return;
+        }
+        float height = size * AssetManager.CHARACTER_PIXELS / AssetManager.TILE_PIXELS;
+        painter.image(image, x, y + size - height, size, height);
+        drawOverlays(painter, x, y, size);
+        if (showBubble && isWaiting() && !isBackupComing()) { // once backup is coming, the flare shows instead
+            drawHelpBubble(painter, x, y, size, assets);
+        }
+    }
+
+    /**
+     * Someone found but not yet helped shows a bouncing "!" bubble by their head,
+     * so they read as a person who needs help (decision 0017). 3/4 of a tile: the
+     * 16 px bubble at a whole 3x, so its pixels stay square.
+     */
+    private void drawHelpBubble(Painter painter, float x, float y, float size, AssetManager assets) {
+        int frame = (int) ((System.currentTimeMillis() / BUBBLE_FRAME_MILLIS) % 2);
+        TextureRegion bubble = assets.getFrame("emote", 0, frame, AssetManager.TILE_PIXELS, AssetManager.TILE_PIXELS);
+        if (bubble != null) {
+            float bubbleSize = size * 0.75f;
+            painter.image(bubble, x + size * 0.45f, y - size * 1.05f, bubbleSize, bubbleSize);
+        }
+    }
+
+    /**
+     * Which frame to draw on the map. By default the two frames of a small idle
+     * movement (rocking, breathing) take turns; MinorSurvivor walks and waves.
+     */
+    protected TextureRegion getMapFrame(AssetManager assets, boolean moving) {
+        int frame = (int) ((System.currentTimeMillis() / IDLE_FRAME_MILLIS + row + col) % 2);
+        return assets.getFrame(getImageKey(), 0, frame, AssetManager.TILE_PIXELS, AssetManager.CHARACTER_PIXELS);
+    }
+
+    /** The way they last moved (they face it while following); DOWN if they haven't. */
+    protected Direction getMoveDirection() {
+        for (Direction direction : Direction.values()) {
+            if (direction.getRowChange() == row - prevRow && direction.getColChange() == col - prevCol) {
+                return direction;
+            }
+        }
+        return Direction.DOWN;
+    }
+
+    /** Steps taken so far (the walk alternates feet). */
+    protected int getStepCount() {
+        return stepCount;
+    }
+
+    private void drawOverlays(Painter painter, float x, float y, float size) {
         if (trapped) {
             drawDebris(painter, x, y, size);
         }
-        drawTag(painter, x, y, size);
         drawExtras(painter, x, y, size);
         drawConditionBar(painter, x, y, size);
     }

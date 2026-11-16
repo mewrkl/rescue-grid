@@ -40,7 +40,7 @@ public class ObjectiveTracker {
         Survivor nearest = nearestNeedingHelp(board, rescuer);
         if (turns.isTargetReached()) {
             return nearest == null ? "Step onto the EXIT to leave"
-                    : "Leave by the EXIT, or save more for a bonus";
+                    : "Leave by the EXIT, or save more for a star";
         }
         if (nearest != null) {
             return nearest.getNeed();
@@ -48,7 +48,24 @@ public class ObjectiveTracker {
         if (!turns.getCallingSurvivors().isEmpty()) {
             return "Someone is calling for HELP! Follow it";
         }
-        return "Search the dark. Dog Handler (3): press E";
+        return "Search the dark. The dog (3, E) smells 8 steps around";
+    }
+
+    /**
+     * A number that changes whenever the player gets somewhere: someone found,
+     * freed, stabilised, picked up or rescued. GamePanel gives a hint when it
+     * hasn't changed for a while.
+     */
+    public int getProgressMark(GameBoard board) {
+        int mark = 0;
+        for (Survivor survivor : board.getSurvivors()) {
+            mark += survivor.isRevealed() ? 1 : 0;
+            mark += survivor.isTrapped() ? 0 : 2;
+            mark += survivor.needsBackup() ? 0 : 4;
+            mark += survivor.isWaiting() ? 0 : 8;
+            mark += survivor.isRescued() ? 16 : 0;
+        }
+        return mark;
     }
 
     /** The closest revealed survivor who still needs something done, or null. */

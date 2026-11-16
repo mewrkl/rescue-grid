@@ -1,9 +1,12 @@
 package rescuegrid.model.survivors;
 
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 
+import rescuegrid.assets.AssetManager;
 import rescuegrid.graphics.Painter;
 import rescuegrid.logic.InvalidMoveException;
+import rescuegrid.model.Direction;
 import rescuegrid.model.Survivor;
 import rescuegrid.model.rescuers.Rescuer;
 
@@ -15,6 +18,9 @@ import rescuegrid.model.rescuers.Rescuer;
 public class MinorSurvivor extends Survivor {
 
     private static final Color GREEN = Painter.rgb(74, 190, 110);
+    private static final int WAVE_OUT_FRAME = 3;      // survivor_minor.png's 4th and 5th columns
+    private static final int WAVE_UP_FRAME = 4;
+    private static final long WAVE_MILLIS = 300;      // waving: arm out, arm up...
 
     public MinorSurvivor(int row, int col, int ticksToLast) {
         super(row, col, ticksToLast);
@@ -30,12 +36,27 @@ public class MinorSurvivor extends Survivor {
 
     @Override
     protected String whatTheyNeed() {
-        return "Minor: walk onto them, they follow you";
+        return "Walk into them: they follow you";
     }
 
     @Override
     public String getInjuryName() {
         return "Minor";
+    }
+
+    /** They can walk: following you they face the way they go and step; waiting, they wave and shout. */
+    @Override
+    protected TextureRegion getMapFrame(AssetManager assets, boolean moving) {
+        int row;
+        int frame;
+        if (isWaiting()) {
+            row = Direction.DOWN.ordinal();
+            frame = (System.currentTimeMillis() / WAVE_MILLIS) % 2 == 0 ? WAVE_OUT_FRAME : WAVE_UP_FRAME;
+        } else {
+            row = getMoveDirection().ordinal();
+            frame = moving ? 1 + getStepCount() % 2 : 0;
+        }
+        return assets.getFrame(getImageKey(), row, frame, AssetManager.TILE_PIXELS, AssetManager.CHARACTER_PIXELS);
     }
 
     @Override

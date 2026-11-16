@@ -112,6 +112,40 @@ public class HazardManager {
         }
     }
 
+    /**
+     * Training: like planCollapses, but only floor within `radius` steps of (row, col),
+     * so the player sees the orange tiles and learns to step off them.
+     */
+    public void planCollapsesNear(GameBoard board, int row, int col, int radius) {
+        planCollapses(board);
+        List<Tile> near = new ArrayList<>();
+        for (Tile tile : allTiles(board)) {
+            int distance = Math.abs(tile.getRow() - row) + Math.abs(tile.getCol() - col);
+            if (distance <= radius && tile.canCollapse() && board.getRescuerAt(tile.getRow(), tile.getCol()) == null
+                    && board.getSurvivorAt(tile.getRow(), tile.getCol()) == null
+                    && !isNextToExit(board, tile.getRow(), tile.getCol())
+                    && !isPassage(board, tile.getRow(), tile.getCol())) {
+                near.add(tile);
+            }
+        }
+        Collections.shuffle(near, random);
+        plannedCollapses.clear();
+        for (int i = 0; i < RANDOM_COLLAPSES && i < near.size(); i++) {
+            plannedCollapses.add(near.get(i));
+        }
+    }
+
+    /** A one-tile-wide doorway or corridor: blocked on both sides (left and right, or above and below). */
+    private boolean isPassage(GameBoard board, int row, int col) {
+        return (isBlocked(board, row, col - 1) && isBlocked(board, row, col + 1))
+                || (isBlocked(board, row - 1, col) && isBlocked(board, row + 1, col));
+    }
+
+    private boolean isBlocked(GameBoard board, int row, int col) {
+        Tile tile = board.getTile(row, col);
+        return tile == null || !tile.isWalkable();
+    }
+
     /** True if the next aftershock will collapse the tile at (row, col). */
     public boolean willCollapse(GameBoard board, int row, int col) {
         Tile tile = board.getTile(row, col);

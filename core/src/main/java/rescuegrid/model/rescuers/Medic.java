@@ -6,11 +6,13 @@ import rescuegrid.graphics.Painter;
 import rescuegrid.logic.InvalidMoveException;
 import rescuegrid.model.GameBoard;
 import rescuegrid.model.Survivor;
+import rescuegrid.model.tiles.Tile;
 
 /**
  * The Medic treats survivors, buying them more time before they are lost, and
  * stabilises critical survivors so backup can fetch them. She treats the survivor
  * she is carrying or leading, or one lying on her tile or the tile she faces.
+ * In training she can also practise on a dummy (a tile that isTreatable()).
  */
 public class Medic extends Rescuer {
 
@@ -20,6 +22,16 @@ public class Medic extends Rescuer {
 
     public Medic(int row, int col) {
         super(row, col);
+    }
+
+    /** Someone carried, following, here or faced, or the training dummy. */
+    @Override
+    public boolean hasSpecialTarget(GameBoard board) {
+        if (getCarriedSurvivor() != null || getFollower() != null || findSurvivorNearby(board) != null) {
+            return true;
+        }
+        Tile faced = getFacedTile(board);
+        return faced != null && faced.isTreatable();
     }
 
     @Override
@@ -35,6 +47,11 @@ public class Medic extends Rescuer {
             patient = findSurvivorNearby(board);
         }
         if (patient == null) {
+            Tile faced = getFacedTile(board);
+            if (faced != null && faced.isTreatable()) {
+                startCooldown();
+                return "Treated! On a real survivor, Treat gives them more time";
+            }
             throw new InvalidMoveException("Face or carry a survivor to treat");
         }
         String result = patient.treat(HEAL_AMOUNT); // a critical survivor is also stabilised

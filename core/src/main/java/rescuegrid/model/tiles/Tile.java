@@ -44,6 +44,11 @@ public abstract class Tile implements Drawable {
         return false;
     }
 
+    /** Can the Medic practise Treat on this tile? Only the training dummy says yes. */
+    public boolean isTreatable() {
+        return false;
+    }
+
     /** Is this tile on fire? Only Fire says yes. Used for fire damage and spreading. */
     public boolean isBurning() {
         return false;
@@ -61,6 +66,11 @@ public abstract class Tile implements Drawable {
 
     /** Will the next aftershock collapse this tile no matter what? Only CrackedFloor says yes. */
     public boolean collapsesInAftershock() {
+        return false;
+    }
+
+    /** Does opening this training gate number remove this tile? Only Barrier says yes. */
+    public boolean opensWithGate(int gate) {
         return false;
     }
 
@@ -90,15 +100,76 @@ public abstract class Tile implements Drawable {
         return col;
     }
 
-    /** Draws the tile's image, or the placeholder art if the image is missing. */
+    /** Draws the tile's sprite (frame getImageFrame() of its sheet), or the placeholder art if it's missing. */
     @Override
     public void draw(Painter painter, float x, float y, float size, AssetManager assets) {
-        TextureRegion image = assets.getImage(getImageKey());
+        TextureRegion image = assets.getFrame(getImageKey(), 0, getImageFrame(),
+                AssetManager.TILE_PIXELS, AssetManager.TILE_PIXELS);
         if (image != null) {
             painter.image(image, x, y, size, size);
         } else {
             drawFallback(painter, x, y, size);
         }
+    }
+
+    /**
+     * Draws the tile on the map, where it can see its neighbours. By default: the
+     * tile, then the soft shadow a wall casts on the tile below it or to its right
+     * (light comes from the top-left). Wall overrides this to pick its shape.
+     */
+    public void drawOnBoard(Painter painter, float x, float y, float size, AssetManager assets, GameBoard board) {
+        draw(painter, x, y, size, assets);
+        if (isWall()) {
+            return;
+        }
+        drawShadow(painter, x, y, size, assets, board, -1, 0, Wall.SHADOW_BELOW);
+        drawShadow(painter, x, y, size, assets, board, 0, -1, Wall.SHADOW_RIGHT);
+    }
+
+    private void drawShadow(Painter painter, float x, float y, float size, AssetManager assets, GameBoard board,
+                            int rowChange, int colChange, int frame) {
+        Tile next = board.getTile(row + rowChange, col + colChange);
+        if (next != null && next.isWall()) {
+            TextureRegion shadow = assets.getFrame("wall", 0, frame, AssetManager.TILE_PIXELS,
+                    AssetManager.TILE_PIXELS);
+            if (shadow != null) {
+                painter.image(shadow, x, y, size, size);
+            }
+        }
+    }
+
+    /** Which frame of the sprite sheet to draw: a variant, or an animation frame. 0 by default. */
+    protected int getImageFrame() {
+        return 0;
+    }
+
+    /** Is this a wall (it gets the wall's shape and casts shadows)? Only Wall says yes. */
+    public boolean isWall() {
+        return false;
+    }
+
+    /**
+     * Can sight and the dog's scent pass over this tile? Anything you can walk on,
+     * plus low furniture (Prop) that blocks walking but not looking.
+     */
+    public boolean isSeeThrough() {
+        return isWalkable();
+    }
+
+    /** Picks one of several looks for this tile, the same one every frame (weights: how common each is). */
+    protected int pickVariant(int... weights) {
+        int total = 0;
+        for (int weight : weights) {
+            total += weight;
+        }
+        int roll = positionRandom().nextInt(total);
+        for (int i = 0; i < weights.length; i++) {
+            roll -= weights[i];
+            if (roll < 0) {
+                return i;
+            }
+        }
+        return 0;
     }
 
     /** Shape art used until sprites exist. Subclasses add their own details. */

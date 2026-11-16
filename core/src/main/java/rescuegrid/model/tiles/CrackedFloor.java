@@ -53,6 +53,11 @@ public class CrackedFloor extends Floor {
         return "cracked_floor";
     }
 
+    @Override
+    protected int getImageFrame() {
+        return 0;
+    }
+
     /** Floor art plus two jagged dark cracks running from top to bottom. */
     @Override
     protected void drawFallback(Painter painter, float x, float y, float size) {

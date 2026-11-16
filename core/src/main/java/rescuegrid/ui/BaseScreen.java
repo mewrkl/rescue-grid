@@ -12,7 +12,7 @@ import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.utils.ScreenUtils;
-import com.badlogic.gdx.utils.viewport.ScreenViewport;
+import com.badlogic.gdx.utils.viewport.FitViewport;
 
 import rescuegrid.graphics.Painter;
 import rescuegrid.model.Drawable;
@@ -35,7 +35,9 @@ abstract class BaseScreen extends ScreenAdapter {
     protected BaseScreen(GameFrame game) {
         this.game = game;
         this.style = game.getStyle();
-        this.stage = new Stage(new ScreenViewport());
+        // Always laid out at the window's size, then scaled to fit the screen
+        // (fullscreen keeps the shape, with dark bars at the sides if needed).
+        this.stage = new Stage(new FitViewport(GameFrame.WINDOW_WIDTH, GameFrame.WINDOW_HEIGHT));
         this.root = new Table();
         this.root.setFillParent(true);
         this.stage.addActor(root);

@@ -18,12 +18,22 @@ public class MovementCalculator {
 
     public static final int SIGHT_RANGE = 4; // walking steps
 
-    /** Is a single step in this direction allowed right now? */
+    /**
+     * Is a single step in this direction allowed right now? A survivor waiting
+     * there is in the way, like a person would be: walking into them helps them.
+     */
     public boolean canStep(GameBoard board, Rescuer rescuer, Direction direction) {
         int row = rescuer.getRow() + direction.getRowChange();
         int col = rescuer.getCol() + direction.getColChange();
         Tile target = board.getTile(row, col);
-        return target != null && target.isWalkable() && board.getRescuerAt(row, col) == null;
+        return target != null && target.isWalkable() && board.getRescuerAt(row, col) == null
+                && board.getSurvivorAt(row, col) == null;
+    }
+
+    /** The survivor waiting on the next tile in this direction, or null. */
+    public Survivor survivorAhead(GameBoard board, Rescuer rescuer, Direction direction) {
+        return board.getSurvivorAt(rescuer.getRow() + direction.getRowChange(),
+                rescuer.getCol() + direction.getColChange());
     }
 
     /** Works out what the rescuer can see, and marks it visible and explored. */
@@ -43,6 +53,19 @@ public class MovementCalculator {
                 }
             }
         }
+    }
+
+    /** Every tile the scent reaches within `range` steps (true = reached). Used to show the range. */
+    public boolean[][] scentReach(GameBoard board, Rescuer rescuer, int range) {
+        int[][] best = newBestArray(board);
+        explore(board, rescuer.getRow(), rescuer.getCol(), range, best, true);
+        boolean[][] reached = new boolean[board.getRows()][board.getCols()];
+        for (int row = 0; row < board.getRows(); row++) {
+            for (int col = 0; col < board.getCols(); col++) {
+                reached[row][col] = best[row][col] >= 0;
+            }
+        }
+        return reached;
     }
 
     /** The waiting survivors within `range` steps. Scent passes through rubble, not walls. */
@@ -70,7 +93,7 @@ public class MovementCalculator {
         best[row][col] = stepsLeft; // this tile is reached
 
         Tile tile = board.getTile(row, col);
-        boolean canContinue = tile.isWalkable() || (passThroughRubble && tile.isClearable());
+        boolean canContinue = tile.isSeeThrough() || (passThroughRubble && tile.isClearable());
         if (!canContinue || stepsLeft == 0) {
             return; // we can see a wall, but not past it
         }

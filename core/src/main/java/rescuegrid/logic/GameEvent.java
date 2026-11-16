@@ -16,7 +16,8 @@ public class GameEvent {
         BACKUP_ARRIVED,
         HELP_CALL,
         AFTERSHOCK_WARNING,
-        AFTERSHOCK
+        AFTERSHOCK,
+        SURVIVOR_FADING  // a survivor you have found is running out of time
     }
 
     private final Type type;

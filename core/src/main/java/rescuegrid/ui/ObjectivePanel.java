@@ -1,70 +1,48 @@
 package rescuegrid.ui;
 
-import java.util.List;
-
-import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.scenes.scene2d.ui.Cell;
-import com.badlogic.gdx.scenes.scene2d.ui.Image;
+import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
-import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
-
-import rescuegrid.graphics.Painter;
-import rescuegrid.logic.Objective;
 
 /**
- * The objective checklist in the top-left corner of the map, like a quest
- * tracker: three steps with a box each (filled = done), and the next thing to do.
+ * One slim line in the top-left corner of the map: what to do right now
+ * ("> Take them to the EXIT"). The full checklist lives in the side panel,
+ * so this card covers as little of the map as possible.
  */
 class ObjectivePanel extends Table {
 
-    private static final int LINES = 3;
-    private static final float WIDTH = 248;
-    private static final Color OPEN_BOX = Painter.rgba(255, 255, 255, 50);
+    private static final float MAX_WIDTH = 520;
 
-    private final Drawable doneBox;
-    private final Drawable openBox;
-    private final Image[] boxes;
-    private final Label[] lines;
     private final Label nextStep;
-    private final Cell<Label> nextCell;
+    private final GlyphLayout layout;
+    private boolean allowed;
 
     ObjectivePanel(UiStyle style) {
         setBackground(style.smallCard());
-        defaults().left();
-        doneBox = style.solid(UiStyle.TEXT_SECONDARY);
-        openBox = style.solid(OPEN_BOX);
-
-        add(style.pixelLabel("OBJECTIVE", 8, UiStyle.TEXT_SECONDARY)).padBottom(8).row();
-        boxes = new Image[LINES];
-        lines = new Label[LINES];
-        for (int i = 0; i < LINES; i++) {
-            boxes[i] = new Image(openBox);
-            lines[i] = style.label(" ", UiStyle.TEXT);
-            Table row = new Table();
-            row.add(boxes[i]).size(8);
-            row.add(lines[i]).padLeft(8);
-            add(row).padTop(i == 0 ? 0 : 4).row();
-        }
         nextStep = style.label(" ", UiStyle.SELECTED);
         nextStep.setWrap(true);
-        nextCell = add(nextStep).width(WIDTH).padTop(8);
-        row();
+        layout = new GlyphLayout();
+        allowed = true;
+        add(nextStep).left();
     }
 
-    /** Done steps get a filled box and dim text; the next step (if any) is in the accent colour. */
-    void refresh(List<Objective> objectives, String next) {
-        for (int i = 0; i < LINES && i < objectives.size(); i++) {
-            Objective objective = objectives.get(i);
-            boxes[i].setDrawable(objective.isDone() ? doneBox : openBox);
-            lines[i].setText(objective.getText());
-            lines[i].setColor(objective.isDone() ? UiStyle.TEXT_SECONDARY : UiStyle.TEXT);
-        }
+    /** False while the briefing is up: it says the same thing and they would overlap. */
+    void setAllowed(boolean allowed) {
+        this.allowed = allowed;
+    }
+
+    /** Shows the next step, or hides the card when there is none (e.g. in training). */
+    void refresh(String next) {
+        setVisible(allowed && next != null);
         if (next == null) {
-            nextCell.setActor(null).padTop(0); // no gap where the line would be
-        } else {
-            nextStep.setText("> " + next);
-            nextCell.setActor(nextStep).padTop(8);
+            return;
+        }
+        String text = "> " + next;
+        if (!text.contentEquals(nextStep.getText())) {
+            nextStep.setText(text);
+            layout.setText(nextStep.getStyle().font, text);
+            getCell(nextStep).width(Math.min(MAX_WIDTH, layout.width + 1)); // only as wide as its line
+            invalidateHierarchy();
         }
     }
 }

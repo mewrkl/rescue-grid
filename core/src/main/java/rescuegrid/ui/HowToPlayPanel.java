@@ -28,6 +28,8 @@ public class HowToPlayPanel extends BaseScreen {
     private static final float ICON_SIZE = 40;
     private static final float TEXT_WIDTH = COLUMN_WIDTH - ICON_SIZE - 16;
 
+    private Runnable back; // the main menu, or the paused game
+
     public HowToPlayPanel(GameFrame game) {
         super(game);
 
@@ -43,15 +45,21 @@ public class HowToPlayPanel extends BaseScreen {
         columns.add(survivorColumn()).width(COLUMN_WIDTH).top().padRight(24);
         columns.add(buildingColumn()).width(COLUMN_WIDTH).top();
 
+        back = game::showMenu;
         MenuList menu = createMenu();
-        menu.addOption("BACK", game::showMenu);
-        menu.setBackAction(game::showMenu);
+        menu.addOption("BACK", () -> back.run());
+        menu.setBackAction(() -> back.run());
 
         root.add(style.pixelLabel("HOW TO PLAY", 32, UiStyle.TEXT)).row();
         root.add(goal).padTop(24).row();
         root.add(columns).padTop(32).row();
         root.add(menu).padTop(32).row();
         root.add(hint("Enter or Esc to go back")).padTop(16).row();
+    }
+
+    /** Where BACK and Esc go: the main menu, or the paused game. */
+    public void setBack(Runnable back) {
+        this.back = back;
     }
 
     private Table controlsColumn() {
@@ -61,7 +69,8 @@ public class HowToPlayPanel extends BaseScreen {
         keyRow(column, "Next role", "TAB");
         keyRow(column, "Use ability on the tile you face", "E");
         keyRow(column, "Call backup for a critical survivor", "Q");
-        keyRow(column, "Pause", "ESC");
+        keyRow(column, "Pause menu", "ESC");
+        keyRow(column, "Fullscreen", "F11");
         return column;
     }
 
@@ -93,11 +102,11 @@ public class HowToPlayPanel extends BaseScreen {
     private Table survivorColumn() {
         Table column = heading("SURVIVORS");
         iconRow(column, new MinorSurvivor(0, 0, Survivor.DEFAULT_CONDITION), "Minor (green)",
-                "Walk onto them: they follow you out.");
+                "Walk into them: they follow you. One at a time.");
         iconRow(column, new SeriousSurvivor(0, 0, Survivor.DEFAULT_CONDITION), "Serious (yellow)",
-                "Walk onto them to carry them (slower).");
+                "Walk into them to carry them. One at a time, slower.");
         iconRow(column, new CriticalSurvivor(0, 0, Survivor.DEFAULT_CONDITION), "Critical (red)",
-                "Medic treats them, then Q calls backup.");
+                "Too hurt to move. Medic treats, then Q calls backup.");
         Survivor trapped = new SeriousSurvivor(0, 0, Survivor.DEFAULT_CONDITION);
         trapped.setTrapped(true);
         iconRow(column, trapped, "Trapped", "The Engineer lifts the debris first.");

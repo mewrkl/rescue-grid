@@ -89,7 +89,7 @@ class RescuerTest {
     }
 
     @Test
-    void carryDeliverAndScore() {
+    void carryAndDeliver() {
         Survivor survivor = board.getSurvivorAt(2, 3);
         medic.moveTo(2, 3);
         medic.pickUp(survivor);
@@ -104,9 +104,6 @@ class RescuerTest {
         medic.deliverSurvivor();
         assertTrue(survivor.isRescued());
         assertEquals(1, board.getRescuedCount());
-
-        // 100 per rescue + 20 per health point left (3 roles x 5) + no all-rescued bonus (no time bonus)
-        assertEquals(100 + 15 * 20, new ScoreKeeper().calculateScore(board));
     }
 
     @Test

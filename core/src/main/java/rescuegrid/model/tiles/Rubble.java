@@ -48,6 +48,11 @@ public class Rubble extends Tile {
         return "rubble";
     }
 
+    @Override
+    protected int getImageFrame() {
+        return pickVariant(1, 1);
+    }
+
     /** A dusty base with a pile of irregular six-sided rocks. */
     @Override
     protected void drawFallback(Painter painter, float x, float y, float size) {

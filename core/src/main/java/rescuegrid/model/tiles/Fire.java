@@ -1,9 +1,7 @@
 package rescuegrid.model.tiles;
 
 import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
 
-import rescuegrid.assets.AssetManager;
 import rescuegrid.graphics.Painter;
 import rescuegrid.model.GameBoard;
 
@@ -19,6 +17,7 @@ public class Fire extends Tile {
     private static final Color OUTER_FLAME = Painter.rgb(236, 96, 28);
     private static final Color INNER_FLAME = Painter.rgb(255, 206, 64);
     private static final int FLICKER_MILLIS = 140;
+    private static final int FRAMES = 4;
 
     private int age;
 
@@ -62,18 +61,14 @@ public class Fire extends Tile {
         return "fire";
     }
 
-    /** Fire flickers: every FLICKER_MILLIS it switches between two frames. */
+    /**
+     * Fire flickers: every FLICKER_MILLIS the next of the sheet's 4 frames.
+     * Neighbouring fires start on different frames, so it doesn't look like one blink.
+     */
     @Override
-    public void draw(Painter painter, float x, float y, float size, AssetManager assets) {
-        TextureRegion image = assets.getImage(isSecondFrame() ? "fire2" : "fire");
-        if (image == null) {
-            image = assets.getImage("fire");
-        }
-        if (image != null) {
-            painter.image(image, x, y, size, size);
-        } else {
-            drawFallback(painter, x, y, size);
-        }
+    protected int getImageFrame() {
+        long frame = System.currentTimeMillis() / FLICKER_MILLIS;
+        return (int) ((frame + row + col * 2) % FRAMES);
     }
 
     /** Dark scorched base with three flames whose heights change each frame. */

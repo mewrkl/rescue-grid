@@ -1,6 +1,7 @@
 package rescuegrid.ui;
 
 import java.util.ArrayList;
+import java.util.function.IntConsumer;
 
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
@@ -14,7 +15,8 @@ import com.badlogic.gdx.utils.Align;
 
 /**
  * A centred column of menu options with one selected. Up/Down or W/S move,
- * Enter or Space choose, Esc goes back; the mouse works too.
+ * Enter or Space choose, Esc goes back; the mouse works too. An option can also
+ * be a setting that Left/Right (or A/D) change, like a volume.
  */
 public class MenuList extends Table {
 
@@ -28,6 +30,7 @@ public class MenuList extends Table {
     private final ArrayList<Label> labels;
     private final ArrayList<Label[]> arrows;
     private final ArrayList<Runnable> actions;
+    private final ArrayList<IntConsumer> adjusters; // Left/Right on a setting (-1 or +1); null if none
     private Runnable backAction;
     private int selected;
 
@@ -37,12 +40,21 @@ public class MenuList extends Table {
         this.labels = new ArrayList<>();
         this.arrows = new ArrayList<>();
         this.actions = new ArrayList<>();
+        this.adjusters = new ArrayList<>();
         this.backAction = null;
         this.selected = 0;
     }
 
-    /** Adds an option at the bottom of the list. */
-    public void addOption(String text, Runnable action) {
+    /** Adds an option at the bottom of the list. Returns its label, so its text can change. */
+    public Label addOption(String text, Runnable action) {
+        return addSetting(text, action, null);
+    }
+
+    /**
+     * Adds a setting: Left/Right call adjust with -1 or +1 (e.g. volume down or up),
+     * and Enter or a click runs action. Returns its label, so its text can show the value.
+     */
+    public Label addSetting(String text, Runnable action, IntConsumer adjust) {
         int index = labels.size();
         Label label = style.pixelLabel(text, OPTION_SIZE, UiStyle.TEXT_SECONDARY);
         label.setAlignment(Align.center);
@@ -72,6 +84,7 @@ public class MenuList extends Table {
         labels.add(label);
         arrows.add(new Label[] {left, right});
         actions.add(action);
+        adjusters.add(adjust);
 
         // Each option is its own little row, so the arrows sit right beside its text.
         // Hidden arrows still take up their space, so the text stays centred.
@@ -81,6 +94,7 @@ public class MenuList extends Table {
         row.add(right).padLeft(ARROW_GAP);
         add(row).height(ROW_HEIGHT).row();
         select(selected);
+        return label;
     }
 
     /** Removes every option (used when the result screen rebuilds its menu). */
@@ -89,6 +103,7 @@ public class MenuList extends Table {
         labels.clear();
         arrows.clear();
         actions.clear();
+        adjusters.clear();
         selected = 0;
     }
 
@@ -132,6 +147,13 @@ public class MenuList extends Table {
                 }
                 if (keycode == Input.Keys.UP || keycode == Input.Keys.W) {
                     select((selected - 1 + labels.size()) % labels.size());
+                    return true;
+                }
+                boolean left = keycode == Input.Keys.LEFT || keycode == Input.Keys.A;
+                boolean right = keycode == Input.Keys.RIGHT || keycode == Input.Keys.D;
+                if ((left || right) && adjusters.get(selected) != null) {
+                    adjusters.get(selected).accept(left ? -1 : 1);
+                    clickSound.run(); // at the new volume, so you hear the change
                     return true;
                 }
                 if (keycode == Input.Keys.ENTER || keycode == Input.Keys.NUMPAD_ENTER

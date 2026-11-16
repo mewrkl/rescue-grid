@@ -41,6 +41,12 @@ public class Floor extends Tile {
         return "floor";
     }
 
+    /** Four looks (plain is the most common), so big rooms don't look stamped out. */
+    @Override
+    protected int getImageFrame() {
+        return pickVariant(6, 2, 1, 1);
+    }
+
     /** Base colour plus a few small speckles so the floor looks like concrete. */
     @Override
     protected void drawFallback(Painter painter, float x, float y, float size) {

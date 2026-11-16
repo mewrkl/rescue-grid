@@ -1,5 +1,6 @@
 package rescuegrid.logic;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -7,6 +8,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.PriorityQueue;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -15,6 +17,7 @@ import rescuegrid.model.RescueTeam;
 import rescuegrid.model.Survivor;
 import rescuegrid.model.rescuers.Rescuer;
 import rescuegrid.model.survivors.CriticalSurvivor;
+import rescuegrid.model.tiles.Prop;
 
 /**
  * Checks every level is fair for EVERY possible pick of random survivor spots.
@@ -30,8 +33,9 @@ class LevelBalanceTest {
     private static final double SAFETY = 0.8; // plans must fit in 80% of the time
     private static final double FIRE_FREE_SECONDS = 40;
 
+    /** Training is calm until the timed part (see Tutorial), so it has its own check below. */
     @ParameterizedTest
-    @ValueSource(ints = {0, 1, 2, 3})
+    @ValueSource(ints = {1, 2, 3})
     void everyPickOfSurvivorSpotsCanReachTheTargetInTime(int levelNumber) {
         LevelData level = LevelData.forLevel(levelNumber);
         String[] rows = new LevelLoader().readLines(level.getFileName());
@@ -72,6 +76,84 @@ class LevelBalanceTest {
         }
         System.out.println("Level " + levelNumber + ": " + picks.size() + " picks, worst uses "
                 + Math.round(worst * 100) + "% of the time available");
+    }
+
+    /**
+     * Training's timed part starts next to the critical survivor: change to the Dog
+     * Handler, walk down the hall to the hidden survivor's room (the rubble on the
+     * way costs a change to the Engineer and the clearing), wait out the aftershock,
+     * and carry them to the exit. A wasted sniff and its cooldown are allowed for.
+     */
+    @Test
+    void theTrainingTimedPartFitsInTime() {
+        LevelData level = LevelData.forLevel(LevelData.TUTORIAL);
+        String[] rows = new LevelLoader().readLines(level.getFileName());
+        int[] hidden = find(rows, 'S');
+        double there = walkingSeconds(rows, new int[] {4, 27})[hidden[0]][hidden[1]];
+        double back = walkingSeconds(rows, find(rows, 'X'))[hidden[0]][hidden[1]]
+                / Rescuer.STEP_DELAY * Rescuer.CARRY_STEP_DELAY;
+        double wastedSniff = 8.0; // the Dog Handler's cooldown
+        double total = RescueTeam.GEAR_CHANGE_SECONDS + wastedSniff + there + TurnManager.WARNING_SECONDS + back;
+        double life = level.getSurvivorCondition() * TurnManager.TICK_SECONDS; // serious: 2 points a tick
+        System.out.println("Training timed part: " + Math.round(total) + " s of " + Math.round(life) + " s");
+        assertTrue(total <= SAFETY * life, "the timed part needs " + Math.round(total) + " s of " + life);
+    }
+
+    /**
+     * Survivors are in the way (you walk into them, not over them), so none of them
+     * may cut a level in two: with every possible survivor spot filled, the player
+     * must still reach every other tile, and stand next to every survivor.
+     */
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1, 2, 3})
+    void survivorsNeverBlockTheWay(int levelNumber) {
+        String[] rows = new LevelLoader().readLines(LevelData.forLevel(levelNumber).getFileName());
+        int[] start = find(rows, 'P');
+        boolean[][] open = reachable(rows, start, false);
+        boolean[][] blocked = reachable(rows, start, true);
+        for (int r = 0; r < rows.length; r++) {
+            for (int c = 0; c < rows[r].length(); c++) {
+                if (isSurvivorSpot(rows[r].charAt(c))) {
+                    assertTrue(blocked[r - 1][c] || blocked[r + 1][c] || blocked[r][c - 1] || blocked[r][c + 1],
+                            "level " + levelNumber + ": nobody can get next to the survivor at (" + r + "," + c + ")");
+                } else {
+                    assertEquals(open[r][c], blocked[r][c],
+                            "level " + levelNumber + ": survivors cut off (" + r + "," + c + ")");
+                }
+            }
+        }
+    }
+
+    /** Walls, fire, furniture (Prop letters) and the training dummy can't be walked through. */
+    private static boolean isBlocked(char ch) {
+        return ch == '#' || ch == 'F' || ch == 'd' || Prop.Kind.forSymbol(ch) != null;
+    }
+
+    private static boolean isSurvivorSpot(char ch) {
+        return ch == '?' || ch == 'S' || ch == 'T' || ch == 'm' || ch == '!';
+    }
+
+    /** Tiles the player can reach (through rubble and training doors), optionally treating survivors as solid. */
+    private static boolean[][] reachable(String[] rows, int[] start, boolean survivorsBlock) {
+        boolean[][] seen = new boolean[rows.length][rows[0].length()];
+        List<int[]> todo = new ArrayList<>();
+        todo.add(start);
+        seen[start[0]][start[1]] = true;
+        int[][] moves = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        while (!todo.isEmpty()) {
+            int[] at = todo.remove(todo.size() - 1);
+            for (int[] m : moves) {
+                int r = at[0] + m[0];
+                int c = at[1] + m[1];
+                char ch = rows[r].charAt(c);
+                if (seen[r][c] || isBlocked(ch) || (survivorsBlock && isSurvivorSpot(ch))) {
+                    continue;
+                }
+                seen[r][c] = true;
+                todo.add(new int[] {r, c});
+            }
+        }
+        return seen;
     }
 
     /**
@@ -174,7 +256,7 @@ class LevelBalanceTest {
                 int nr = r + m[0];
                 int nc = c + m[1];
                 char ch = rows[nr].charAt(nc);
-                if (ch == '#' || ch == 'F') {
+                if (isBlocked(ch)) {
                     continue;
                 }
                 double cost = Rescuer.STEP_DELAY + (ch == 'R' || ch == 'C' ? RUBBLE_SECONDS : 0);

@@ -39,6 +39,11 @@ public class BurntFloor extends Floor {
         return "burnt_floor";
     }
 
+    @Override
+    protected int getImageFrame() {
+        return pickVariant(1, 1);
+    }
+
     /** Dark floor with soot blotches. */
     @Override
     protected void drawFallback(Painter painter, float x, float y, float size) {

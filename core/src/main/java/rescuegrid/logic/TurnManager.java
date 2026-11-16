@@ -19,6 +19,8 @@ public class TurnManager {
     public static final double HELP_INTERVAL = 6.0;    // seconds between one survivor's calls
     public static final double HELP_CALL_SECONDS = 1.5; // how long each call shows on screen
     private static final double HELP_OFFSET = 1.9;     // so survivors don't all call at once
+    /** A found survivor with this little time left gets a warning (beep, message, pulse on the map). */
+    public static final double[] FADING_WARNINGS = {30, 10};
 
     private final GameBoard board;
     private final HazardManager hazards;
@@ -30,7 +32,11 @@ public class TurnManager {
     private int ticksUntilAftershock;
     private boolean warningGiven;
     private boolean evacuated;
+    private boolean survivorsWeaken;   // false in training until the timed part
+    private boolean hazardsRunning;    // fire and the aftershock timer; false all through training
+    private boolean helpCallsOn;
     private final int[] lastCall; // which call each survivor made last (for the sound)
+    private final int[] warningsGiven; // how many FADING_WARNINGS each survivor has had
 
     public TurnManager(GameBoard board, HazardManager hazards, LevelData level) {
         this.board = board;
@@ -42,7 +48,11 @@ public class TurnManager {
         this.ticksUntilAftershock = level.getAftershockTicks();
         this.warningGiven = false;
         this.evacuated = false;
+        this.survivorsWeaken = true;
+        this.hazardsRunning = true;
+        this.helpCallsOn = true;
         this.lastCall = new int[board.getSurvivors().size()];
+        this.warningsGiven = new int[board.getSurvivors().size()];
     }
 
     /** Called every frame by GamePanel with the seconds since the last frame. */
@@ -55,7 +65,7 @@ public class TurnManager {
             secondsSinceTick -= TICK_SECONDS;
             runWorldTick();
         }
-        if (!warningGiven && getSecondsUntilAftershock() <= WARNING_SECONDS) {
+        if (hazardsRunning && !warningGiven && getSecondsUntilAftershock() <= WARNING_SECONDS) {
             warningGiven = true;
             hazards.planCollapses(board);
             events.add(new GameEvent(GameEvent.Type.AFTERSHOCK_WARNING, ""));
@@ -70,11 +80,18 @@ public class TurnManager {
 
     /** Everything that happens to the building once per tick, in this order. */
     private void runWorldTick() {
-        hazards.applyFireDamage(board, events);   // 1. damage before spreading
-        hazards.spreadFire(board, events);        // 2.
-        hazards.burnOutFires(board);              // 3.
-        tickSurvivors();                          // 4.
-        ticksUntilAftershock--;                   // 5.
+        if (hazardsRunning) {
+            hazards.applyFireDamage(board, events);   // 1. damage before spreading
+            hazards.spreadFire(board, events);        // 2.
+            hazards.burnOutFires(board);              // 3.
+        }
+        if (survivorsWeaken) {
+            tickSurvivors();                          // 4.
+            warnFading();
+        }
+        if (hazardsRunning || warningGiven) {         // (training: only a planned aftershock counts down)
+            ticksUntilAftershock--;                   // 5.
+        }
         if (ticksUntilAftershock <= 0) {
             hazards.triggerAftershock(board, events);
             ticksUntilAftershock = level.getAftershockTicks();
@@ -89,7 +106,7 @@ public class TurnManager {
             boolean wasRescued = survivor.isRescued();
             survivor.update(seconds);
             if (!wasRescued && survivor.isRescued()) {
-                events.add(new GameEvent(GameEvent.Type.BACKUP_ARRIVED, "Backup carried a survivor out"));
+                events.add(new GameEvent(GameEvent.Type.BACKUP_ARRIVED, "Backup has them on the stretcher"));
             }
         }
     }
@@ -110,6 +127,76 @@ public class TurnManager {
         if (rescuer.isLeading() && rescuer.getFollower().isLost()) {
             rescuer.releaseFollower();
         }
+    }
+
+    /**
+     * Warns once at 30 s and once at 10 s left, for survivors the player has found.
+     * Treating them past a warning resets it, so it can come again later.
+     */
+    private void warnFading() {
+        List<Survivor> survivors = board.getSurvivors();
+        for (int i = 0; i < survivors.size(); i++) {
+            Survivor survivor = survivors.get(i);
+            double secondsLeft = getSecondsLeft(survivor);
+            if (survivor.isRescued() || survivor.isLost() || !survivor.isRevealed()) {
+                continue;
+            }
+            if (secondsLeft > FADING_WARNINGS[0]) {
+                warningsGiven[i] = 0;
+            } else if (warningsGiven[i] < FADING_WARNINGS.length
+                    && secondsLeft <= FADING_WARNINGS[warningsGiven[i]]) {
+                // Skip a warning that has already passed (e.g. found with 8 s left: only "10 s").
+                while (warningsGiven[i] + 1 < FADING_WARNINGS.length
+                        && secondsLeft <= FADING_WARNINGS[warningsGiven[i] + 1]) {
+                    warningsGiven[i]++;
+                }
+                events.add(new GameEvent(GameEvent.Type.SURVIVOR_FADING, "A " + survivor.getInjuryName()
+                        .toLowerCase() + " survivor has " + (int) FADING_WARNINGS[warningsGiven[i]] + " s left!"));
+                warningsGiven[i]++;
+            }
+        }
+    }
+
+    /** About how long until a survivor is lost if nobody treats them. */
+    public double getSecondsLeft(Survivor survivor) {
+        return survivor.getTicksLeft() * TICK_SECONDS;
+    }
+
+    /** True if a found survivor still in the building is down to the last warning's time or less. */
+    public boolean isFading(Survivor survivor) {
+        return survivorsWeaken && survivor.isRevealed() && !survivor.isRescued() && !survivor.isLost()
+                && getSecondsLeft(survivor) <= FADING_WARNINGS[0];
+    }
+
+    /** Training: survivors keep their condition until this is turned on. */
+    public void setSurvivorsWeaken(boolean on) {
+        survivorsWeaken = on;
+    }
+
+    /** Training: no fire damage or spreading and no aftershock timer while this is off. */
+    public void setHazardsRunning(boolean on) {
+        hazardsRunning = on;
+    }
+
+    /** Training: calls for help only while the lesson about them is on screen. */
+    public void setHelpCallsOn(boolean on) {
+        helpCallsOn = on;
+    }
+
+    /**
+     * Training: warns of an aftershock right now that collapses floor near (row, col),
+     * then hits WARNING_SECONDS later. Does nothing if one is already coming.
+     */
+    public void startAftershockNear(int row, int col) {
+        if (warningGiven) {
+            return;
+        }
+        warningGiven = true;
+        hazards.planCollapsesNear(board, row, col, 3);
+        // Two ticks away, one second into the current one: 2 x 3 - 1 = 5 s (WARNING_SECONDS).
+        ticksUntilAftershock = 2;
+        secondsSinceTick = TICK_SECONDS * 2 - WARNING_SECONDS;
+        events.add(new GameEvent(GameEvent.Type.AFTERSHOCK_WARNING, ""));
     }
 
     /**
@@ -175,7 +262,7 @@ public class TurnManager {
     }
 
     private boolean canCall(Survivor survivor) {
-        if (!survivor.isWaiting() || survivor.isRevealed()) {
+        if (!helpCallsOn || !survivor.isWaiting() || survivor.isRevealed()) {
             return false;
         }
         Rescuer rescuer = board.getActiveRescuer();
@@ -209,8 +296,16 @@ public class TurnManager {
         return elapsedSeconds;
     }
 
+    /** False while aftershocks are switched off (training, until its one planned aftershock). */
+    public boolean isAftershockCounting() {
+        return hazardsRunning || warningGiven;
+    }
+
     /** Seconds until the next aftershock, for the HUD countdown. */
     public double getSecondsUntilAftershock() {
+        if (!hazardsRunning && !warningGiven) {
+            return level.getAftershockTicks() * TICK_SECONDS; // stopped (training): show a full bar
+        }
         return ticksUntilAftershock * TICK_SECONDS - secondsSinceTick;
     }
 }

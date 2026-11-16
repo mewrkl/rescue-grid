@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.List;
 
 import rescuegrid.model.rescuers.Rescuer;
+import rescuegrid.model.tiles.Floor;
 import rescuegrid.model.tiles.Tile;
 
 /** The building: a grid of tiles plus the rescue team and the survivors in it. */
@@ -53,6 +54,23 @@ public class GameBoard {
             newTile.markExplored();
         }
         grid[row][col] = newTile;
+    }
+
+    /**
+     * Opens every training door with this gate number: each one becomes Floor.
+     * Returns where the doors were ({row, col} each), so they can be pointed out.
+     */
+    public List<int[]> openGate(int gate) {
+        List<int[]> opened = new ArrayList<>();
+        for (int row = 0; row < getRows(); row++) {
+            for (int col = 0; col < getCols(); col++) {
+                if (grid[row][col].opensWithGate(gate)) {
+                    replaceTile(row, col, new Floor(row, col));
+                    opened.add(new int[] {row, col});
+                }
+            }
+        }
+        return opened;
     }
 
     /** Adds a role to the team. The first one added is the one on the map. */

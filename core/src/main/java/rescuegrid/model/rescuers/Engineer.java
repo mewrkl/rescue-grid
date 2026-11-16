@@ -23,6 +23,17 @@ public class Engineer extends Rescuer {
         super(row, col);
     }
 
+    /** Rubble ahead, or a trapped survivor here or ahead. */
+    @Override
+    public boolean hasSpecialTarget(GameBoard board) {
+        Tile target = getFacedTile(board);
+        if (target != null && target.isClearable()) {
+            return true;
+        }
+        Survivor survivor = findSurvivorNearby(board);
+        return survivor != null && survivor.isTrapped();
+    }
+
     @Override
     public String specialAction(GameBoard board) throws InvalidMoveException {
         if (!canUseSpecial()) {

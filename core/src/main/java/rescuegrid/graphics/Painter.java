@@ -229,6 +229,15 @@ public class Painter implements Disposable {
         signFont.draw(batch, layout, centerX - layout.width / 2, topY);
     }
 
+    /** Like text(), but on a box of colour `box`, so it can be read on any tile. */
+    public void textOnBox(String text, Color color, Color box, float centerX, float topY, float padding) {
+        layout.setText(signFont, text);
+        float width = layout.width + 2 * padding;
+        float height = layout.height + 2 * padding;
+        fillRect(box, centerX - width / 2, topY - padding, width, height);
+        text(text, color, centerX, topY);
+    }
+
     @Override
     public void dispose() {
         batch.dispose();

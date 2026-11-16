@@ -141,6 +141,38 @@ Acted on the teacher's feedback from the first showing. Everything is committed 
       - RESET PROGRESS in the game;
       - the merged training steps played through by hand (the training test plays all 11).
 
+13. **Training that explains, readable furniture, timers** (2026-11-16, decisions 0025–0026, not committed yet, 95 tests pass):
+    - **Training stops to explain** (`logic/Lesson`, `GameState.LESSON`):
+      - It freezes, the camera glides to the thing, and a card with a picture waits for Enter. That happens for each role, each survivor type as they come into sight, fire (which visibly spreads), the timers, the dog's find, and the aftershock.
+      - The tests now go Medic, Engineer, Dog. The dog smells the green survivor through the taped door (`Tile.letsScentThrough`).
+    - **Timers:** every found survivor shows "45 s" under them (orange at 30, red at 10), replacing the bar; the briefing explains it. Level 1 gives survivors twice the time (40 ticks).
+    - **Start hint:** "Find the survivors: explore, or press 3 then E so the dog sniffs for them".
+    - **Bugs fixed** (found with bug-hunter):
+      - The Medic treated their follower instead of the red survivor in front (`Medic.specialAction` now prefers the faced survivor; regression test in `RescuerTest`).
+      - Furniture drew on black squares (`Prop` now paints its floor first).
+      - The taped door's shadows replaced floor pixels instead of shading them (`SpriteSheetTest` now guards all stand-alone tiles).
+    - **Furniture:**
+      - Lockers, bookshelves, filing and medicine cabinets now stand 1.5 tiles tall (`props_tall.png`).
+      - The first bump into each kind says "Locker: furniture blocks the way".
+      - Levels 1-3 have about half the pieces (26/51/54 to 12/28/25).
+    - **`RESCUEGRID_SAVE_DIR`:** a new launcher option that keeps settings in another folder. My test runs used it, because the player's real save now has fullscreen on and progress.
+    - **Seen in the real game:**
+      - the Medic, Engineer, Dog Handler and green survivor cards;
+      - the dog finding the green survivor;
+      - timers on Level 1 survivors (30 s orange, 108 s white);
+      - furniture on floor, the standing bookshelf, and the bump message.
+    - **Then played the whole training in the game** (separate save, with temporary jump keys for walking between rooms, since removed). All cards appeared with the camera on their subject:
+      - Medic, Engineer and Dog Handler;
+      - green, yellow and trapped, red;
+      - the timer card, with the backup radio and flare behind it;
+      - fire (the camera glides to it and it spreads a tile);
+      - found by scent (with the "63 s" timer);
+      - the aftershock (with orange tiles flashing).
+    - **Fixed during that run:**
+      - The fire card only triggered once the fire was in sight, which could be never, since it sits at the far end of the hall. It now shows when the hall opens, with the fire lit up.
+      - The yellow card kept saying "walk into them" while carrying; it now says "Carry them to the EXIT".
+    - **Automation note:** a card ignores Enter for its first 0.6 s, so scripted runs must wait before pressing it.
+
 ## IN PROGRESS
 Nothing half-done.
 
@@ -163,6 +195,8 @@ Nothing half-done.
 - 0022: one marker per survivor, and fewer repeated messages.
 - 0023: training merges related steps (17 to 11).
 - 0024: Continue, and ask about training once (plus Options and a real pause menu).
+- 0025: the training stops to explain each new thing; the dog test really finds someone.
+- 0026: furniture reads as furniture (on the floor, tall pieces standing, bump names, fewer pieces).
 - Untested numbers (need a playtest, all marked *(tune)* in the plan):
   - targets 3 / 4 / 4 out of 4 / 5 / 6 survivors;
   - drain 1 / 2 / 3 points per tick (1 once stabilised);
@@ -176,9 +210,10 @@ Nothing half-done.
 
 ## READ FIRST
 - `RESCUE_GRID_PLAN.md`: the "What changed in v4" box at the top, then sections 4.3, 4.4 and 5.
-- `decisions/0007`–`0024`.
+- `decisions/0007`–`0026`.
 
 ## GOTCHAS
+- **Test runs and the real save:** the game reads `~/.prefs/rescuegrid`. Run with `RESCUEGRID_SAVE_DIR=<some folder>` so a test never changes the player's progress or opens in their fullscreen.
 - **Building on this PC:** the `java` on PATH is a JRE 8, which can't compile. Use the Corretto JDK:
   `JAVA_HOME=/c/Users/PC/.jdks/corretto-22.0.2 ./gradlew test -Porg.gradle.java.installations.paths=C:/Users/PC/.jdks/corretto-22.0.2`
   (IntelliJ's Gradle JVM setting avoids this.)

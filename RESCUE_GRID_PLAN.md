@@ -16,6 +16,12 @@ This document describes the game we are building, its rules, its class design, a
 >   - Scent shows its range and E/Q are dimmed when they can't act (0021).
 >   - The checklist and minimap moved into the HUD with labels, wall tops are a lighter stone cap that no longer reads as a hole, the title screen is calmer with the team at 4x, and a puff of dust covers the role change.
 > - **Menus like real games (2026-11-16, decision 0024):** Continue + Play (the training is offered once), an Options screen (music and sound volume, fullscreen, reset progress), a real pause menu with "Are you sure?", one marker per survivor (0022), and an 11-step training (0023).
+> - **After more playtesting (2026-11-16):**
+>   - The training stops to explain each new thing, and the dog test really finds someone (0025).
+>   - Found survivors always show their seconds left.
+>   - Furniture sits on the floor (the black boxes were a bug), tall pieces stand up, walking into furniture names it, and there are about half as many pieces (0026).
+>   - Level 1 gives survivors twice the time.
+>   - Fixed: the Medic treated the person following them instead of the red survivor in front.
 > - New classes: `RescueTeam`, `MinorSurvivor`, `SeriousSurvivor`, `CriticalSurvivor`, `ObjectiveTracker`, `Objective`, `Tutorial`, `ObjectivePanel`, then `BackupTeam`, `TeamLineup`, `OptionsPanel` and `TrainingPromptPanel` (2026-11-16). `Survivor` is now abstract; `ScoreKeeper` was removed (decision 0018).
 
 > **What changed in v3 (2026-11-09): Swing → libGDX.** Our teacher asked us to use libGDX and libraries instead of Swing. The game rules, class names and OOP design are unchanged; only the window, drawing, input, sound and screens moved to libGDX. See section 3 and `decisions/0004`.
@@ -208,7 +214,7 @@ The mission is a **success** if the number rescued is at least the level's targe
 | Level | Size (approx.) | Survivors | Target | Aftershock every |
 |---|---|---|---|---|
 | Training | 34 × 14 | 4 | 4 | never (one planned aftershock at step 15) |
-| 1 | 30 × 20 | 4 | 3 | 15 ticks |
+| 1 | 30 × 20 | 4 | 3 | 15 ticks (survivors' time doubled on 2026-11-16: 120 s for a serious one) |
 | 2 | 35 × 25 | 5 | 4 | 12 ticks |
 | 3 | 40 × 30 | 6 | 4 | 9 ticks |
 
@@ -284,11 +290,11 @@ The map is in `assets/levels/tutorial.txt`. The first room has a practice rubble
 
 The `Tutorial` class runs **11 strict steps in 4 chapters** (decisions 0011, 0013, 0015 and 0023), one prompt at a time at the bottom of the map. It had 17 steps until 2026-11-16. Steps that teach one idea are now one step, and the card changes as you do each part, so there are fewer "DONE!" stops:
 
-*Chapter 1, Moving and roles*
+*Chapter 1, Moving and roles* (Medic first since 2026-11-16, decision 0025)
 1. Walk: try two directions with W, A, S, D (or the arrows).
-2. Press 2 for the Engineer, then **test the ability**: clear the marked practice rubble with E.
-3. Press 3 for the Dog Handler and **test the ability**: sniff with E. (Nobody is in the room, so the dog finds no scent; the next prompt says why.)
-4. Press 1 for the Medic and **test the ability**: treat the marked dummy with E.
+2. You start as the Medic: a card explains the three roles and Treat, then **test it** on the marked dummy with E.
+3. Press 2 for the Engineer: a card explains it, then **test it**: clear the marked practice rubble with E.
+4. Press 3 for the Dog Handler: a card explains it, then stand on the marked spot by the taped door and sniff (E). The dog **really finds the green survivor** in the next room (scent passes taped doors and rubble, not sight).
 
 *Chapter 2, Rescuing*
 5. Gate `1` opens. Follow the call for help, walk into the minor survivor (they follow you, one at a time), and lead them to the EXIT.
@@ -302,6 +308,17 @@ The `Tutorial` class runs **11 strict steps in 4 chapters** (decisions 0011, 001
 9. Clear that room's rubble as the Engineer.
 10. An aftershock collapses floor near you: step off the orange tiles (it never collapses a doorway or one-tile corridor). Then carry the survivor out.
 11. Leave.
+
+**Stop-and-read cards (decision 0025).**
+- Before each new thing, the game freezes, the camera glides to it, and a card with a picture explains it. Enter carries on, and a key held from walking can't skip it. Each card shows once.
+- The things that get a card:
+  - each role;
+  - each survivor type, as soon as they come into sight;
+  - fire, which visibly spreads one tile while the card is up;
+  - the timers, when the clock starts;
+  - the one the dog finds;
+  - the aftershock: the floor about to fall flashes, and the countdown starts after Enter.
+- `Tutorial` queues a `Lesson`; `GamePanel` shows it in `GameState.LESSON`.
 
 Each test step works the same way: the card first says which number to press, and only once you are that role does it say "Test your ability now" and mark the target. Each role's E is unlocked for its own test step, locked again afterwards, and unlocked for good at the step that uses it for real.
 
@@ -428,7 +445,7 @@ Reworked again 2026-11-16 after an audit: everything has a label, so nothing is 
 - **WITH YOU:** "Carry 0/1" and "Follow 0/1" on one line, always shown so the limits are clear, with the carried survivor and the follower drawn beside them when there is one.
 - **MAP:** the minimap, with "Esc Pause" beside its heading.
 - **Scent range** (map, 2026-11-16): while you are the Dog Handler, faint paw prints mark every explored tile the scent reaches (8 steps), brighter when Scent is ready. A sniff that finds nobody new only takes 2 s to recharge (decision 0021).
-- **Running out of time** (added 2026-11-16): when a survivor you have found is down to 30 s, then 10 s, a double beep plays and a message says so ("A serious survivor has 30 s left!"). From 30 s they pulse red on the map with the seconds under them. Treating them past a warning resets it.
+- **Timers on the map** (2026-11-16, decision 0025): every survivor you have found shows the seconds they have left under them ("45 s"), in white, orange from 30 s and red from 10 s, replacing the old bar. The one following you shows theirs too. At 30 s and 10 s a double beep plays, with a message only if they are off screen. From 30 s they also pulse red. Treating them past a warning resets it. The briefing says it plainly: "Every survivor has a timer...".
 - **Hint when stuck** (added 2026-11-16, not in training): if for 20 s nobody has been found, freed, stabilised, picked up or rescued, the radio crackles and the message box repeats the objective card's next step ("Radio: Search the dark. Dog Handler (3): press E"). Not while carrying or leading someone, because the green EXIT marker already shows the way.
 - **Messages** about things that just happened (an invalid action, someone burning, a survivor lost) appear for 3 s in a small box at the bottom of the map, not in the sidebar. Nothing the sidebar already shows is repeated there.
 
@@ -740,6 +757,7 @@ Other concepts we want visible in the code:
 | `rubble` | 2 looks: a heap of concrete, one with a steel bar | `Rubble` |
 | `fire` | 4 flicker frames | `Fire`, neighbours out of step |
 | `exit`, `barrier`, `dummy` | 1 each | lit EXIT sign over a doorway, caution tape, first-aid dummy |
+| `props_tall` | 8 (16 × 24): locker, bookshelf, filing cabinet, medicine cabinet, then damaged | `Prop` draws these standing up, 1.5 tiles tall, so they read as furniture, not doors (decision 0026) |
 | `props` | 26: the 13 kinds (sofa, table, bookshelf, plant, bed, desk, filing cabinet, water cooler, hospital bed, medicine cabinet, wheelchair, drip stand, locker) intact, then the same 13 damaged | `Prop`; about a third of the furniture is damaged, picked by position |
 | `decor` | 4: papers, broken glass, rug, puddle | `DecoratedFloor` |
 | `medic`, `engineer`, `dog_handler` | rows up/down/left/right × stand, step A, step B (16 × 24) | `Rescuer.drawOnMap` (faces the way they face, alternate feet while stepping) |
@@ -815,7 +833,7 @@ Every milestone must compile and run. Build a thin working version first, then a
 
 > **Status (2026-11-15):** Weeks 1–4 are built on libGDX, except the sprites:
 > - The whole game is playable, from the menu through the training level and all three levels, with placeholder art, sound and music.
-> - 92 JUnit tests cover the rules (`gradlew test`), including a full play-through of the training, a balance check of every level, the stars, the saved progress and the low-time warnings.
+> - 95 JUnit tests cover the rules (`gradlew test`), including a full play-through of the training, a balance check of every level, the stars, the saved progress and the low-time warnings.
 > - Added after the first playtest (2026-11-09): a survivor counter in the HUD, leaving through the exit once the target is reached, and random survivor spots.
 > - Added after the teacher's feedback (2026-11-15): one rescuer who changes role, triage survivor types with backup, trapped survivors, start at the exit with grouped survivors, calls for help, the objective checklist, and the training level.
 > - Sprites built 2026-11-16 (section 10, decision 0016).

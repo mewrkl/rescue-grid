@@ -19,3 +19,6 @@ build/
 # OS junk
 Thumbs.db
 .DS_Store
+
+# Review picture written by tools/SpriteMaker.java on every run
+tools/sprite_preview.png

@@ -68,6 +68,8 @@ public class SoundMaker {
         save(sounds, "fire_spread", crackle, 0.18);
         save(sounds, "aftershock_warning", rumble(1.4, 0.9, false), 0.55);
         save(sounds, "aftershock", rumble(1.8, 1.0, true), 0.9);
+        save(sounds, "time_warning", concat(tone(Wave.SQUARE, 1320, 1320, 0.07, 1), silence(0.06),
+                tone(Wave.SQUARE, 1320, 1320, 0.07, 1)), 0.35);
         save(sounds, "survivor_lost", concat(note(Wave.TRIANGLE, 67, 0.18, 1.0), note(Wave.TRIANGLE, 64, 0.18, 1.0),
                 note(Wave.TRIANGLE, 60, 0.4, 0.8)), 0.55);
 
@@ -78,6 +80,7 @@ public class SoundMaker {
         mixInto(fanfare, concat(note(Wave.TRIANGLE, 48, 0.4, 0.3), note(Wave.TRIANGLE, 55, 0.24, 0.5),
                 note(Wave.TRIANGLE, 60, 0.5, 0.6)), 0);
         save(sounds, "success", fanfare, 0.5);
+        save(sounds, "star", concat(note(Wave.SQUARE, 84, 0.05, 1.0), note(Wave.SQUARE, 91, 0.18, 0.8)), 0.4);
         save(sounds, "failure", concat(note(Wave.TRIANGLE, 67, 0.22, 0.8), note(Wave.TRIANGLE, 65, 0.22, 0.8),
                 note(Wave.TRIANGLE, 63, 0.22, 0.8), note(Wave.TRIANGLE, 60, 0.7, 0.6)), 0.6);
 

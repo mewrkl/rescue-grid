@@ -1,5 +1,6 @@
 package rescuegrid;
 
+import com.badlogic.gdx.Files;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3WindowAdapter;
@@ -24,6 +25,12 @@ public class Main {
         config.setResizable(false);
         config.useVsync(true);
         config.setForegroundFPS(60);
+        // For testing: RESCUEGRID_SAVE_DIR keeps settings and progress in another folder,
+        // so a test run never changes a player's real save (or opens in their fullscreen).
+        String saveDir = System.getenv("RESCUEGRID_SAVE_DIR");
+        if (saveDir != null && !saveDir.isEmpty()) {
+            config.setPreferencesConfig(saveDir, Files.FileType.Absolute);
+        }
         config.setWindowListener(new Lwjgl3WindowAdapter() {
             @Override
             public void focusLost() {

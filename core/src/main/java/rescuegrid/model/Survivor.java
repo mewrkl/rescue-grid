@@ -289,7 +289,7 @@ public abstract class Survivor implements Drawable {
             drawFigure(painter, x, y, size);
             drawTag(painter, x, y, size);
         }
-        drawOverlays(painter, x, y, size);
+        drawOverlays(painter, x, y, size, true);
     }
 
     /**
@@ -313,7 +313,7 @@ public abstract class Survivor implements Drawable {
         }
         float height = size * AssetManager.CHARACTER_PIXELS / AssetManager.TILE_PIXELS;
         painter.image(image, x, y + size - height, size, height);
-        drawOverlays(painter, x, y, size);
+        drawOverlays(painter, x, y, size, false); // on the map, the seconds under them replace the bar
         if (showBubble && isWaiting() && !isBackupComing()) { // once backup is coming, the flare shows instead
             drawHelpBubble(painter, x, y, size, assets);
         }
@@ -357,12 +357,15 @@ public abstract class Survivor implements Drawable {
         return stepCount;
     }
 
-    private void drawOverlays(Painter painter, float x, float y, float size) {
+    /** Debris, badges and (in the HUD and menus) the condition bar. */
+    private void drawOverlays(Painter painter, float x, float y, float size, boolean conditionBar) {
         if (trapped) {
             drawDebris(painter, x, y, size);
         }
         drawExtras(painter, x, y, size);
-        drawConditionBar(painter, x, y, size);
+        if (conditionBar) {
+            drawConditionBar(painter, x, y, size);
+        }
     }
 
     /** The sprite to use if one exists: survivor_minor, survivor_serious or survivor_critical. */

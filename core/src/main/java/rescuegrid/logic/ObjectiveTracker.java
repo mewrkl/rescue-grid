@@ -48,7 +48,7 @@ public class ObjectiveTracker {
         if (!turns.getCallingSurvivors().isEmpty()) {
             return "Someone is calling for HELP! Follow it";
         }
-        return "Search the dark. The dog (3, E) smells 8 steps around";
+        return "Find the survivors: explore, or press 3 then E so the dog sniffs for them";
     }
 
     /**

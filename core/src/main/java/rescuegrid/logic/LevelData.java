@@ -36,15 +36,17 @@ public class LevelData {
     }
 
     /**
-     * Later levels give survivors more time (20/25/30 ticks = 60/75/90 s) because
-     * there is more building to search, but aftershocks come faster.
+     * Survivors' time (a serious one: 40/25/30 ticks = 120/75/90 s). Level 1, the
+     * first real level, is generous so new players learn the timers without losing
+     * everyone (2026-11-16); Levels 2 and 3 have more building to search, and
+     * aftershocks come faster.
      */
     public static LevelData forLevel(int number) {
         switch (number) {
             case TUTORIAL: // survivors only weaken in the timed part at the end (see Tutorial)
                 return new LevelData(0, "/levels/tutorial.txt", 4, 4, 20, 25, "", 0.08, 7L, "");
             case 1:
-                return new LevelData(1, "/levels/level1.txt", 4, 3, 15, 20, "ms", 0.15, 1001L,
+                return new LevelData(1, "/levels/level1.txt", 4, 3, 15, 40, "ms", 0.15, 1001L,
                         "Your first real call-out: no training card this time. Fire spreads, and nobody "
                         + "tells you where survivors are, so listen for calls for HELP.");
             case 2:

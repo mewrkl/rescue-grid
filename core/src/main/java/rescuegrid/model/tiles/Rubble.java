@@ -33,6 +33,12 @@ public class Rubble extends Tile {
     }
 
     /** The only tile the Engineer can clear. */
+    /** Scent gets through the gaps in a heap of rubble. */
+    @Override
+    public boolean letsScentThrough() {
+        return true;
+    }
+
     @Override
     public boolean isClearable() {
         return true;

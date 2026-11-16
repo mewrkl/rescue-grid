@@ -168,6 +168,11 @@ public class TurnManager {
                 && getSecondsLeft(survivor) <= FADING_WARNINGS[0];
     }
 
+    /** True while survivors lose time (always in real levels; in training, from the timed part). */
+    public boolean isSurvivorsWeakening() {
+        return survivorsWeaken;
+    }
+
     /** Training: survivors keep their condition until this is turned on. */
     public void setSurvivorsWeaken(boolean on) {
         survivorsWeaken = on;

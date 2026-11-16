@@ -1,8 +1,10 @@
 package rescuegrid.ui;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
@@ -30,6 +32,7 @@ import rescuegrid.logic.GameEvent;
 import rescuegrid.logic.HazardManager;
 import rescuegrid.logic.InvalidMoveException;
 import rescuegrid.logic.LevelData;
+import rescuegrid.logic.Lesson;
 import rescuegrid.logic.LevelLoader;
 import rescuegrid.logic.MissionReport;
 import rescuegrid.logic.MovementCalculator;
@@ -40,7 +43,15 @@ import rescuegrid.model.Direction;
 import rescuegrid.model.GameBoard;
 import rescuegrid.model.GameState;
 import rescuegrid.model.Survivor;
+import rescuegrid.model.rescuers.DogHandler;
+import rescuegrid.model.rescuers.Engineer;
+import rescuegrid.model.rescuers.Medic;
 import rescuegrid.model.rescuers.Rescuer;
+import rescuegrid.model.survivors.CriticalSurvivor;
+import rescuegrid.model.survivors.MinorSurvivor;
+import rescuegrid.model.survivors.SeriousSurvivor;
+import rescuegrid.model.tiles.CrackedFloor;
+import rescuegrid.model.tiles.Fire;
 import rescuegrid.model.tiles.Tile;
 
 /**
@@ -81,6 +92,11 @@ public class GamePanel extends BaseScreen {
     private static final Color DOT_TODO = Painter.rgba(255, 255, 255, 40);
     private static final double PAN_GLIDE_SECONDS = 0.6; // training: the camera glides to a door that opened...
     private static final double PAN_HOLD_SECONDS = 0.9;  // ...stays a moment, then glides back
+    private static final float TIMER_LINE = 28;           // height of the "45 s" box under a survivor
+    private static final double LESSON_MIN_SECONDS = 0.6;
+    private static final double FIRE_DEMO_SECONDS = 1.2;  // the fire card: when the fire spreads // a card can't be skipped by a key already held
+    private static final float LESSON_TEXT_WIDTH = 520;
+    private static final float LESSON_PICTURE = 64;
     private static final double DONE_SECONDS = 0.9;      // training: how long "DONE!" shows after a step
     private static final float CHAPTER_SHOW_SECONDS = 1.8f;
     private static final double END_PAUSE_SECONDS = 1.6;  // "MISSION COMPLETE" over the map, then the results
@@ -108,6 +124,13 @@ public class GamePanel extends BaseScreen {
     private final Label pauseHint;
     private final MenuList pauseMenu;
     private final Table briefingCard;
+    private final Table lessonCard;
+    private final Label lessonTitle;
+    private final Label lessonBody;
+    private final LessonPicture lessonPicture;
+    private Lesson lesson;            // the training card being shown (state LESSON), or null
+    private double lessonSeconds;     // how long it has been up
+    private boolean fireDemoDone;     // the fire card has shown the fire spreading
     private final Label briefingTitle;
     private final Label briefingGoal;
     private final Label briefingInfo;
@@ -133,6 +156,8 @@ public class GamePanel extends BaseScreen {
     private double shakeSecondsLeft;
     private int shakePixels;
     private Survivor bumped;        // the survivor we last walked into (so holding the key asks only once)
+    private Tile bumpedTile;        // the furniture we last walked into (so holding the key thuds once)
+    private final Set<String> furnitureNamed = new HashSet<>(); // furniture already named this level
     private double panSeconds;      // training: time into the camera's look at a door, or -1
     private int panRow;
     private int panCol;
@@ -173,6 +198,10 @@ public class GamePanel extends BaseScreen {
         this.briefingNew = style.label(" ", UiStyle.TEXT);
         this.briefingStars = new Label[MissionReport.STAR_COUNT];
         this.briefingCard = buildBriefingCard();
+        this.lessonTitle = style.pixelLabel(" ", 16, UiStyle.TEXT);
+        this.lessonBody = style.label(" ", UiStyle.TEXT);
+        this.lessonPicture = new LessonPicture();
+        this.lessonCard = buildLessonCard();
         this.endTitle = style.pixelLabel(" ", 32, UiStyle.TEXT);
         this.endLine = style.label(" ", UiStyle.TEXT_SECONDARY);
         this.endCard = buildEndCard();
@@ -194,8 +223,18 @@ public class GamePanel extends BaseScreen {
         Table pauseCentred = new Table(); // a Stack stretches its children; this keeps the card its own size
         pauseCentred.add(pauseCard);
         middle.add(pauseCentred);
-        mapArea.add(middle).expand().row();
-        mapArea.add(tutorialCard).padBottom(8).row();
+        mapArea.add(middle).expand().fill().row();
+        // The training card and the explanation card share the bottom slot (only one shows at a time),
+        // so the explanation sits as low as it can and the map stays visible above it.
+        Stack bottom = new Stack();
+        Table tutorialAtBottom = new Table();
+        tutorialAtBottom.bottom().add(tutorialCard);
+        Table lessonAtBottom = new Table();
+        lessonAtBottom.bottom().add(lessonCard);
+        lessonAtBottom.setTouchable(Touchable.disabled);
+        bottom.add(tutorialAtBottom);
+        bottom.add(lessonAtBottom);
+        mapArea.add(bottom).padBottom(8).row();
         mapArea.add(toast).padBottom(32);
         root.add(mapArea).width(VIEW_WIDTH).expandY().fillY();
         root.add(new Image(style.solid(UiStyle.BORDER))).width(1).fillY();
@@ -358,8 +397,9 @@ public class GamePanel extends BaseScreen {
         briefingTitle.setText(level.getTitle());
         briefingGoal.setText("Rescue " + level.getTarget() + " of the " + level.getSurvivorCount()
                 + " survivors, then leave by the EXIT.");
-        briefingInfo.setText("Survivors weaken from the start, so watch their bars. An aftershock hits "
-                + "every " + (int) level.getAftershockSeconds() + " s.");
+        briefingInfo.setText("Every survivor has a timer: the seconds under them count down from the start, "
+                + "and at 0 they don't make it. The Medic's Treat (1, E) gives them more time. An aftershock "
+                + "hits every " + (int) level.getAftershockSeconds() + " s.");
         briefingNew.setText(level.getWhatsNew());
         String[] goals = MissionReport.goalsFor(level);
         for (int i = 0; i < briefingStars.length; i++) {
@@ -386,6 +426,8 @@ public class GamePanel extends BaseScreen {
         chapterCard.getColor().a = 0;
         panSeconds = -1;
         bumped = null;
+        bumpedTile = null;
+        furnitureNamed.clear();
         cardCover = 0;
         camera.setBottomCover(0);
         doneSecondsLeft = 0;
@@ -404,6 +446,7 @@ public class GamePanel extends BaseScreen {
         idleSeconds = 0;
         radioSecondsLeft = 0;
         backupTeams.clear();
+        fireDemoDone = false;
         lastProgressMark = objectives.getProgressMark(board);
         movement.computeSight(board, active());
         camera.follow(active().getRow(), active().getCol(), board.getRows(), board.getCols());
@@ -491,6 +534,11 @@ public class GamePanel extends BaseScreen {
             togglePause();
         }
         if (state == GameState.PAUSED) {
+            keys.endFrame();
+            return;
+        }
+        if (state == GameState.LESSON) {
+            updateLesson(seconds);
             keys.endFrame();
             return;
         }
@@ -646,6 +694,9 @@ public class GamePanel extends BaseScreen {
         if (door != null && panSeconds < 0) {
             startPan(door);
         }
+        if (tutorial.hasLesson() && panSeconds < 0 && state == GameState.PLAYING) {
+            showLesson(tutorial.takeLesson());
+        }
         if (tutorial.getStepNumber() != shownStep) {
             boolean newChapter = tutorial.getChapterNumber() != shownChapter;
             shownStep = tutorial.getStepNumber();
@@ -667,6 +718,134 @@ public class GamePanel extends BaseScreen {
         for (int i = 0; i < dots.length; i++) {
             int stepNumber = i + 1;
             dots[i].setColor(stepNumber < current ? EXIT_GUIDE : stepNumber == current ? Color.WHITE : DOT_TODO);
+        }
+    }
+
+    /** Real time in seconds, for pulses that should keep moving while the game is frozen. */
+    private static double wallSeconds() {
+        return System.currentTimeMillis() / 1000.0;
+    }
+
+    // ----- Training: stop-and-read cards (decision 0025) -----
+
+    /** The card: a picture, a title, the explanation, and "Enter to continue". */
+    private Table buildLessonCard() {
+        Table card = new Table();
+        card.setBackground(style.card());
+        lessonBody.setWrap(true);
+        Table words = new Table();
+        words.defaults().left();
+        words.add(lessonTitle).row();
+        words.add(lessonBody).width(LESSON_TEXT_WIDTH).padTop(8).row();
+        Table go = new Table();
+        go.add(style.keycap("Enter")).padRight(8);
+        go.add(style.label("to continue", UiStyle.TEXT_SECONDARY));
+        words.add(go).padTop(16).row();
+        card.add(icon(lessonPicture, LESSON_PICTURE)).size(LESSON_PICTURE).top().padRight(24);
+        card.add(words).top();
+        card.setVisible(false);
+        return card;
+    }
+
+    /** Freezes the training and shows a card; the camera glides to what it is about. */
+    private void showLesson(Lesson next) {
+        lesson = next;
+        lessonSeconds = 0;
+        state = GameState.LESSON;
+        keys.clear();
+        lessonTitle.setText(next.getTitle());
+        lessonBody.setText(next.getBody());
+        lessonPicture.show(next.getPicture());
+        lessonCard.setVisible(true);
+        tutorialCard.setVisible(false);
+        toast.hideNow();
+        sounds.play("radio");
+    }
+
+    /** While the card is up: nothing moves but the camera; Enter (or Space) carries on. */
+    private void updateLesson(float seconds) {
+        lessonSeconds += seconds;
+        if (lesson.getPicture() == Lesson.Picture.FIRE && !fireDemoDone && lessonSeconds >= FIRE_DEMO_SECONDS) {
+            fireDemoDone = true;                  // once the camera is there: watch it spread
+            if (tutorial.spreadFireDemo(board) != null) {
+                sounds.play("fire_spread");
+                movement.computeSight(board, active());
+            }
+        }
+        int[] focus = lesson.getFocus();
+        if (focus != null) {
+            double toFocus = smooth(Math.min(1, lessonSeconds / PAN_GLIDE_SECONDS));
+            double row = active().getDrawRow() + (focus[0] - active().getDrawRow()) * toFocus;
+            double col = active().getDrawCol() + (focus[1] - active().getDrawCol()) * toFocus;
+            camera.follow(row, col, board.getRows(), board.getCols());
+        }
+        boolean go = keys.wasPressed(Input.Keys.ENTER) || keys.wasPressed(Input.Keys.NUMPAD_ENTER)
+                || keys.wasPressed(Input.Keys.SPACE);
+        if (go && lessonSeconds >= LESSON_MIN_SECONDS) {
+            closeLesson();
+        }
+    }
+
+    /** Back to playing: the camera glides back from what the card showed (the game waits for that). */
+    private void closeLesson() {
+        int[] focus = lesson.getFocus();
+        lessonCard.setVisible(false);
+        tutorialCard.setVisible(true);
+        state = GameState.PLAYING;
+        keys.clear();
+        sounds.play("click");
+        if (focus != null) {
+            panRow = focus[0];
+            panCol = focus[1];
+            panSeconds = PAN_GLIDE_SECONDS + PAN_HOLD_SECONDS; // only the glide back is left
+        }
+        lesson = null;
+    }
+
+    /** The picture on the card: the role, the kind of survivor, fire or cracked floor. */
+    private static final class LessonPicture implements rescuegrid.model.Drawable {
+
+        private rescuegrid.model.Drawable picture;
+
+        void show(Lesson.Picture kind) {
+            switch (kind) {
+                case MEDIC:
+                    picture = new Medic(0, 0);
+                    break;
+                case ENGINEER:
+                    picture = new Engineer(0, 0);
+                    break;
+                case DOG_HANDLER:
+                    picture = new DogHandler(0, 0);
+                    break;
+                case MINOR:
+                    picture = new MinorSurvivor(0, 0, Survivor.DEFAULT_CONDITION);
+                    break;
+                case TRAPPED:
+                    SeriousSurvivor trapped = new SeriousSurvivor(0, 0, Survivor.DEFAULT_CONDITION);
+                    trapped.setTrapped(true);
+                    picture = trapped;
+                    break;
+                case CRITICAL:
+                    picture = new CriticalSurvivor(0, 0, Survivor.DEFAULT_CONDITION);
+                    break;
+                case FIRE:
+                    picture = new Fire(0, 0);
+                    break;
+                case AFTERSHOCK:
+                    picture = new CrackedFloor(0, 0);
+                    break;
+                default:                  // SERIOUS, and CLOCK (someone getting weaker)
+                    picture = new SeriousSurvivor(0, 0, Survivor.DEFAULT_CONDITION);
+                    break;
+            }
+        }
+
+        @Override
+        public void draw(Painter painter, float x, float y, float size, AssetManager assets) {
+            if (picture != null) {
+                picture.draw(painter, x, y, size, assets);
+            }
         }
     }
 
@@ -753,6 +932,7 @@ public class GamePanel extends BaseScreen {
         Direction direction = heldDirection();
         if (direction == null) {
             bumped = null; // let go of the key: walking into them again asks again
+            bumpedTile = null;
             return;
         }
         if (tutorial != null) {
@@ -774,9 +954,11 @@ public class GamePanel extends BaseScreen {
             return;
         }
         if (!movement.canStep(board, rescuer, direction)) {
+            bumpInto(rescuer.getFacedTile(board));
             return;
         }
         bumped = null;
+        bumpedTile = null;
         rescuer.moveTo(rescuer.getRow() + direction.getRowChange(), rescuer.getCol() + direction.getColChange());
         sounds.play("step");
         afterStep();
@@ -837,6 +1019,21 @@ public class GamePanel extends BaseScreen {
             if (!turns.evacuate()) {
                 toast.show("Save " + turns.getStillNeeded() + " more before you leave");
             }
+        }
+    }
+
+    /**
+     * Walking into furniture: a soft thud, and the first time in a level its name,
+     * so it's clear it is solid ("Locker: furniture blocks the way").
+     */
+    private void bumpInto(Tile tile) {
+        if (tile == null || tile == bumpedTile || tile.getBumpName() == null) {
+            return;
+        }
+        bumpedTile = tile;
+        sounds.play("denied");
+        if (furnitureNamed.add(tile.getBumpName())) {
+            toast.show(tile.getBumpName() + ": furniture blocks the way");
         }
     }
 
@@ -975,7 +1172,7 @@ public class GamePanel extends BaseScreen {
         drawAbilityReach();
         drawPeople();
         drawBackup();
-        drawFading();
+        drawTimers();
         drawHelpCalls();
         drawGuide();
         drawSurvivorHint();
@@ -1009,7 +1206,7 @@ public class GamePanel extends BaseScreen {
 
     /** 0 to 1 and back, WARNING_PULSES_PER_SECOND times a second. Stops while paused. */
     private float warningPulse() {
-        double cycles = turns.getElapsedSeconds() * WARNING_PULSES_PER_SECOND;
+        double cycles = wallSeconds() * WARNING_PULSES_PER_SECOND; // keeps pulsing on a frozen lesson card
         return (float) (0.5 - 0.5 * Math.cos(cycles * 2 * Math.PI));
     }
 
@@ -1059,7 +1256,14 @@ public class GamePanel extends BaseScreen {
 
     /** Training: the one thing to look at right now (a door, survivor or rubble), or null. */
     private int[] trainingMarker() {
+        if (state == GameState.LESSON) {
+            return lesson.getFocus(); // what the card is about
+        }
         return tutorial == null ? null : tutorial.getMarker(board);
+    }
+
+    private String trainingMarkerLabel() {
+        return state == GameState.LESSON ? lesson.getLabel() : tutorial.getMarkerLabel();
     }
 
     /**
@@ -1069,7 +1273,7 @@ public class GamePanel extends BaseScreen {
     private void drawGuide() {
         int[] marker = trainingMarker();
         if (marker != null) {
-            drawBeacon(marker[0], marker[1], tutorial.getMarkerLabel(), Color.WHITE);
+            drawBeacon(marker[0], marker[1], trainingMarkerLabel(), Color.WHITE);
         } else if (isGuidingToExit()) {
             drawBeacon(exitRow, exitCol, "EXIT", EXIT_GUIDE);
         }
@@ -1080,7 +1284,7 @@ public class GamePanel extends BaseScreen {
         int[] marker = trainingMarker();
         if (marker != null) {
             if (!camera.isInView(marker[0], marker[1])) {
-                drawEdgeArrow(marker[0], marker[1], tutorial.getMarkerLabel(), Color.WHITE);
+                drawEdgeArrow(marker[0], marker[1], trainingMarkerLabel(), Color.WHITE);
             }
         } else if (isGuidingToExit() && !camera.isInView(exitRow, exitCol)) {
             drawEdgeArrow(exitRow, exitCol, "EXIT", EXIT_GUIDE);
@@ -1102,6 +1306,9 @@ public class GamePanel extends BaseScreen {
             if (distance == 1 && survivor.isWaiting() && survivor.isRevealed() && need != null) {
                 float centerX = camera.toMapX(survivor.getCol()) + TILE_SIZE / 2f;
                 float top = camera.toMapY(survivor.getRow()) + TILE_SIZE + 6;
+                if (turns.isSurvivorsWeakening() && !survivor.isBackupComing()) {
+                    top += TIMER_LINE; // under their timer
+                }
                 painter.textOnBox(need, Color.WHITE, HINT_BOX, centerX, top, 4);
             }
         }
@@ -1112,7 +1319,7 @@ public class GamePanel extends BaseScreen {
         if (!camera.isInView(row, col)) {
             return;
         }
-        float pulse = (float) (0.5 - 0.5 * Math.cos(turns.getElapsedSeconds() * 2 * Math.PI));
+        float pulse = (float) (0.5 - 0.5 * Math.cos(wallSeconds() * 2 * Math.PI));
         Color edge = new Color(color.r, color.g, color.b, 0.5f + 0.5f * pulse);
         float x = camera.toMapX(col);
         float y = camera.toMapY(row);
@@ -1222,28 +1429,44 @@ public class GamePanel extends BaseScreen {
     }
 
     /**
-     * A found survivor with 30 s or less left: a fast red pulse round them, and
-     * the seconds under them (unless their need box is there).
+     * Every found survivor shows the seconds they have left under them, so the
+     * timer is always visible: white, orange from 30 s, red from 10 s. From 30 s
+     * they also pulse red. The person following you shows theirs too. Not while
+     * backup is coming (the flare shows that countdown), and not in training's
+     * calm part, where nobody weakens.
      */
-    private void drawFading() {
-        float pulse = (float) (0.5 - 0.5 * Math.cos(turns.getElapsedSeconds() * 4 * Math.PI)); // 2 a second
+    private void drawTimers() {
+        if (!turns.isSurvivorsWeakening()) {
+            return;
+        }
+        float pulse = (float) (0.5 - 0.5 * Math.cos(wallSeconds() * 4 * Math.PI)); // 2 a second
         Color edge = new Color(UiStyle.ERROR.r, UiStyle.ERROR.g, UiStyle.ERROR.b, 0.4f + 0.6f * pulse);
-        Rescuer rescuer = active();
         for (Survivor survivor : board.getSurvivors()) {
-            if (!survivor.isWaiting() || !turns.isFading(survivor)
+            if (!survivor.isWaiting() || !survivor.isRevealed() || survivor.isBackupComing()
                     || !camera.isInView(survivor.getRow(), survivor.getCol())) {
                 continue;
             }
             float x = camera.toMapX(survivor.getCol());
             float y = camera.toMapY(survivor.getRow());
-            painter.outlineRect(edge, x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4, 3);
-            int distance = Math.abs(survivor.getRow() - rescuer.getRow())
-                    + Math.abs(survivor.getCol() - rescuer.getCol());
-            if (distance != 1) {
-                String left = (int) turns.getSecondsLeft(survivor) + " s";
-                painter.textOnBox(left, UiStyle.ERROR, HINT_BOX, x + TILE_SIZE / 2f, y + TILE_SIZE + 6, 4);
+            if (turns.isFading(survivor)) {
+                painter.outlineRect(edge, x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4, 3);
             }
+            drawTimer(survivor, x, y);
         }
+        Survivor follower = active().getFollower();
+        if (follower != null) {
+            double progress = active().stepProgress();
+            drawTimer(follower, camera.toMapX(follower.getDrawCol(progress)),
+                    camera.toMapY(follower.getDrawRow(progress)));
+        }
+    }
+
+    /** "45 s" under a survivor, in white, orange (30 s) or red (10 s). */
+    private void drawTimer(Survivor survivor, float x, float y) {
+        double left = turns.getSecondsLeft(survivor);
+        Color color = left <= TurnManager.FADING_WARNINGS[1] ? UiStyle.ERROR
+                : left <= TurnManager.FADING_WARNINGS[0] ? UiStyle.WARNING : UiStyle.TEXT;
+        painter.textOnBox((int) Math.ceil(left) + " s", color, HINT_BOX, x + TILE_SIZE / 2f, y + TILE_SIZE + 6, 4);
     }
 
     /**

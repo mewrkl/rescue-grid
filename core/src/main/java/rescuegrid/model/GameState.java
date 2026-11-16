@@ -7,6 +7,7 @@ public enum GameState {
     PLAYING,
     ENDING,     // a moment with "MISSION COMPLETE" over the map before the result screen
     PAUSED,
+    LESSON,     // training: frozen while a card explains something new; Enter carries on
     LEVEL_COMPLETE,
     GAME_OVER
 }

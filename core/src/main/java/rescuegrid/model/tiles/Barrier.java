@@ -33,6 +33,12 @@ public class Barrier extends Tile {
         return false;
     }
 
+    /** You can't see past the tape, but the dog can smell round it (the training's dog test). */
+    @Override
+    public boolean letsScentThrough() {
+        return true;
+    }
+
     /** Opens when the Tutorial reaches the step that uses this gate. */
     @Override
     public boolean opensWithGate(int gateNumber) {

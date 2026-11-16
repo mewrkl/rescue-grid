@@ -69,6 +69,19 @@ public abstract class Tile implements Drawable {
         return false;
     }
 
+    /**
+     * Does the dog's scent pass through this tile? Wherever you can see through,
+     * and also rubble and taped doors (Rubble and Barrier say yes).
+     */
+    public boolean letsScentThrough() {
+        return isSeeThrough();
+    }
+
+    /** What to call this tile when someone walks into it ("Locker"), or null for plain walls etc. */
+    public String getBumpName() {
+        return null;
+    }
+
     /** Does opening this training gate number remove this tile? Only Barrier says yes. */
     public boolean opensWithGate(int gate) {
         return false;

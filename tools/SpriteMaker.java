@@ -26,6 +26,7 @@ import javax.imageio.ImageIO;
  *   floor 4 variants | cracked_floor 1 | burnt_floor 2 | rubble 2 | fire 4 frames
  *   wall: top, face, edge N, edge E, edge W, face end W, face end E, shadow N, shadow W
  *   exit, barrier, dummy 1 | props 26 (13 intact, then the same 13 damaged) | decor 4
+ *   props_tall: 8 frames, 16 x 24 (locker, bookshelf, filing cabinet, medicine cabinet; then damaged)
  *   medic, engineer, dog_handler, survivor_minor: rows UP, DOWN, LEFT, RIGHT;
  *     columns stand, step A, step B (survivor_minor has two more: waving out, waving up)
  *   survivor_serious, survivor_critical: 2 frames | emote: "!" bubble x 2, radio bubble x 2
@@ -146,6 +147,10 @@ public class SpriteMaker {
             System.arraycopy(set, 0, props, damaged * 13, 13);
         }
         save(images, "props", row(props));
+        // Lockers, bookshelves, filing and medicine cabinets stand 1.5 tiles tall (intact, then damaged).
+        save(images, "props_tall", row(tallLocker(false), tallBookshelf(false), tallFilingCabinet(false),
+                tallMedicineCabinet(false), tallLocker(true), tallBookshelf(true), tallFilingCabinet(true),
+                tallMedicineCabinet(true)));
         save(images, "decor", row(papers(), glass(), rug(), puddle()));
 
         // ----- People -----
@@ -474,7 +479,10 @@ public class SpriteMaker {
     /** Training doors: a doorway crossed by two bands of caution tape. */
     static Img barrier() {
         Img img = floor(2);
-        img.rect(0, 0, T, 2, argb(0x140E14, 90));
+        for (int x = 0; x < T; x++) {          // shade the top of the doorway (blend, so the floor shows)
+            img.blend(x, 0, argb(0x140E14, 90));
+            img.blend(x, 1, argb(0x140E14, 90));
+        }
         tapeBand(img, 3, 10);
         tapeBand(img, 11, 5);
         return img;
@@ -487,7 +495,7 @@ public class SpriteMaker {
             int color = (p[0] / 2) % 2 == 0 ? TAPE : TAPE_DARK;
             img.set(p[0], p[1], color);
             img.set(p[0], p[1] + 1, color);
-            img.set(p[0], p[1] + 2, argb(0x000000, 60));
+            img.blend(p[0], p[1] + 2, argb(0x000000, 60)); // the tape's shadow on the floor
         }
     }
 
@@ -818,6 +826,121 @@ public class SpriteMaker {
             s.set(5, 11, shade(shade(steel)));
         }
         return prop(s, 2, 12);
+    }
+
+    // ----- Tall furniture: 16 x 24, standing like people, so it reads as furniture, not a door -----
+
+    /**
+     * A standing piece seen from the front and a little from above: a lit top,
+     * the front, a shaded right side, a dark kick plate and a shadow at its feet.
+     * The front is x 2-12, y 5-21; the details go on it.
+     */
+    static Img standing(int color) {
+        Img s = new Img(T, CH);
+        s.rect(3, 2, 12, 3, light(color));              // the top, set back a pixel
+        s.rect(3, 2, 12, 1, light(light(color)));
+        s.rect(13, 3, 2, 19, shade(shade(color)));      // the right side, in shadow
+        s.rect(2, 5, 11, 17, color);                    // the front
+        s.rect(2, 5, 11, 1, light(color));
+        s.rect(2, 21, 11, 1, shade(shade(color)));      // kick plate
+        return s;
+    }
+
+    /** Outline, shadow at the feet, and the piece on top. */
+    static Img standingProp(Img s) {
+        Img img = new Img(T, CH);
+        s.outlineTinted();
+        groundShadow(img, 1, 22, 15);
+        img.draw(s, 0, 0);
+        return img;
+    }
+
+    static Img tallLocker(boolean broken) {
+        int steel = hex(0x5D7383);
+        Img s = standing(steel);
+        s.rect(7, 6, 1, 15, shade(shade(steel)));      // the gap between the two doors
+        for (int door = 0; door < 2; door++) {
+            int left = 3 + door * 5;
+            for (int v = 0; v < 3; v++) {
+                s.rect(left, 7 + v * 2, 3, 1, shade(steel)); // vents
+            }
+            s.rect(left, 13, 3, 2, PAPER);                // name card
+            s.set(door == 0 ? 6 : 8, 16, METAL_LIGHT);    // handles
+            s.set(door == 0 ? 6 : 8, 17, METAL_LIGHT);
+        }
+        if (broken) {
+            s.rect(8, 6, 5, 15, SCREEN);                  // a door hangs open: dark inside
+            s.rect(9, 9, 3, 1, METAL_DARK);               // a shelf inside
+            s.rect(13, 6, 2, 15, light(steel));           // the open door, swung out
+            s.set(4, 10, shade(shade(steel)));            // dents
+            s.set(5, 18, shade(shade(steel)));
+        }
+        return standingProp(s);
+    }
+
+    static Img tallBookshelf(boolean broken) {
+        Img s = standing(WOOD);
+        s.rect(3, 6, 9, 15, WOOD_DARK);                   // the inside
+        int[] colors = {BOOK_RED, BOOK_BLUE, BOOK_GREEN, BOOK_YELLOW, BOOK_BLUE, BOOK_RED};
+        for (int shelf = 0; shelf < 4; shelf++) {
+            int bottom = 9 + shelf * 4;                   // shelves at y 9, 13, 17, 21
+            s.rect(3, bottom, 9, 1, WOOD);
+            boolean empty = broken && (shelf == 1 || shelf == 3);
+            for (int b = 0; b < 4 && !empty; b++) {
+                int color = colors[(b + shelf) % colors.length];
+                int height = 3 - (b % 2);
+                s.rect(3 + b * 2 + (b > 1 ? 1 : 0), bottom - height, 2, height, color);
+                s.set(3 + b * 2 + (b > 1 ? 1 : 0), bottom - height, light(color));
+            }
+        }
+        if (broken) {
+            s.set(4, 12, BOOK_YELLOW);                    // one left leaning on an empty shelf
+            s.set(5, 11, BOOK_YELLOW);
+            s.rect(0, 22, 3, 1, BOOK_RED);                // books on the floor
+            s.rect(12, 22, 3, 1, BOOK_GREEN);
+            s.rect(13, 23, 2, 1, BOOK_BLUE);
+        }
+        return standingProp(s);
+    }
+
+    static Img tallFilingCabinet(boolean broken) {
+        Img s = standing(METAL);
+        for (int d = 0; d < 4; d++) {
+            int top = 6 + d * 4;                          // drawers at y 6, 10, 14, 18
+            s.rect(2, top + 3, 11, 1, METAL_DARK);
+            s.rect(6, top + 1, 3, 1, METAL_LIGHT);        // handle
+            s.rect(4, top, 2, 1, PAPER);                  // label
+        }
+        if (broken) {
+            s.rect(1, 10, 13, 3, light(METAL));           // a drawer pulled right out
+            s.rect(1, 13, 13, 1, METAL_DARK);
+            s.rect(3, 9, 8, 1, PAPER);                    // files sticking up
+            s.rect(0, 22, 3, 1, PAPER);                   // papers on the floor
+            s.rect(12, 23, 3, 1, PAPER);
+        }
+        return standingProp(s);
+    }
+
+    static Img tallMedicineCabinet(boolean broken) {
+        Img s = standing(WHITE);
+        s.rect(3, 6, 9, 6, GLASS);                        // glass doors with bottles behind
+        s.rect(7, 6, 1, 6, SHEET_SHADE);
+        s.rect(4, 8, 1, 3, BOOK_YELLOW);
+        s.rect(5, 9, 1, 2, WATER);
+        s.rect(9, 7, 1, 4, BOOK_RED);
+        s.rect(10, 9, 1, 2, BOOK_GREEN);
+        s.rect(2, 12, 11, 1, SHEET_SHADE);
+        s.rect(6, 14, 3, 6, CROSS_RED);                   // red cross on the lower doors
+        s.rect(4, 16, 7, 2, CROSS_RED);
+        if (broken) {
+            s.rect(3, 6, 9, 6, SCREEN);                   // the glass is broken
+            s.set(4, 7, GLASS);
+            s.set(10, 10, GLASS);
+            s.set(6, 8, GLASS);
+            s.rect(0, 22, 2, 1, GLASS);                   // shards and a bottle on the floor
+            s.rect(12, 22, 2, 1, BOOK_YELLOW);
+        }
+        return standingProp(s);
     }
 
     // ----- Decorations: on the floor, they never block -----

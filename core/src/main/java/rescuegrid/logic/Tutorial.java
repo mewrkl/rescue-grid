@@ -1,6 +1,8 @@
 package rescuegrid.logic;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 
 import rescuegrid.model.Direction;
@@ -8,6 +10,7 @@ import rescuegrid.model.GameBoard;
 import rescuegrid.model.RescueTeam;
 import rescuegrid.model.Survivor;
 import rescuegrid.model.rescuers.Rescuer;
+import rescuegrid.model.tiles.Fire;
 import rescuegrid.model.tiles.Tile;
 
 /**
@@ -21,17 +24,21 @@ import rescuegrid.model.tiles.Tile;
  * calm; from step 8 the clock runs (decision 0011). If the last survivor runs
  * out of time, the timed part starts again from its beginning.
  *
- * Right after learning to change role, the player tests each role's E in the
- * first room: practice rubble, a sniff, and a dummy for the Medic (decision 0015).
+ * Right after walking, the player tests each role's E in the first room: the
+ * Medic treats a dummy, the Engineer clears practice rubble, and the dog smells
+ * the green survivor through the taped door (decisions 0015, 0025).
+ *
+ * Before anything new (each role, each kind of survivor, fire, the clock, the
+ * aftershock) the game stops and a card explains it: a Lesson (decision 0025).
  * Steps that belong together are one step whose card changes as the player goes,
  * e.g. hear the call, walk into them, lead them out (decision 0023): 11 steps, not 17.
  */
 public class Tutorial {
 
     private static final int WALK = 0;
-    private static final int TRY_ENGINEER = 1;
-    private static final int TRY_DOG = 2;
-    private static final int TRY_MEDIC = 3;
+    private static final int TRY_MEDIC = 1;
+    private static final int TRY_ENGINEER = 2;
+    private static final int TRY_DOG = 3;
     private static final int GREEN = 4;       // hear the call, they follow you, lead them out
     private static final int YELLOW = 5;      // clear the rubble, lift the debris, carry them out
     private static final int RED = 6;         // the Medic stabilises them, Q calls backup
@@ -78,6 +85,9 @@ public class Tutorial {
     private int checkpointRow;
     private int checkpointCol;
     private int[][] hidingSpots;
+    private final ArrayDeque<Lesson> lessons;             // cards waiting to be shown
+    private final EnumSet<Lesson.Picture> told;           // each lesson is shown once
+    private int[] sniffSpot;                              // where the dog test reaches the next room
 
     public Tutorial() {
         this.step = WALK;
@@ -89,6 +99,8 @@ public class Tutorial {
         this.calledBackup = false;
         this.usedScent = false;
         this.openedDoors = new ArrayList<>();
+        this.lessons = new ArrayDeque<>();
+        this.told = EnumSet.noneOf(Lesson.Picture.class);
     }
 
     /** Called once when the training level starts: everything is calm. */
@@ -100,6 +112,7 @@ public class Tutorial {
 
     // ----- What the player is allowed to do -----
 
+    /** The Medic is tested first, as the role you start as; changing role comes next. */
     public boolean canChangeRole() {
         return step >= TRY_ENGINEER;
     }
@@ -174,6 +187,142 @@ public class Tutorial {
         }
         follow(board, turns);
         part = partOf(board, turns);
+        queueLessons(board);
+    }
+
+    // ----- Stop-and-read cards (decision 0025) -----
+
+    /** True if a card is waiting: the game should freeze and show it. */
+    public boolean hasLesson() {
+        return !lessons.isEmpty();
+    }
+
+    /** The next card to show, or null. */
+    public Lesson takeLesson() {
+        return lessons.poll();
+    }
+
+    private void tell(Lesson.Picture picture, String title, String body, int[] focus, String label) {
+        if (told.add(picture)) {
+            lessons.add(new Lesson(title, body, picture, focus, label));
+        }
+    }
+
+    /** Before each new thing: the role you just became, the survivor you can now see, and so on. */
+    private void queueLessons(GameBoard board) {
+        if (step == TRY_MEDIC && activeRole == MEDIC) {
+            tell(Lesson.Picture.MEDIC, "THE MEDIC (1)",
+                    "You are one rescuer with three roles: Medic (1), Engineer (2) and Dog Handler (3). Each has "
+                    + "its own ability on E. You start as the MEDIC: Treat gives an injured survivor more time "
+                    + "and stabilises a red (critical) one. It works when you face a survivor, or while you "
+                    + "carry or lead one. Test it now on the training dummy.", null, null);
+        }
+        if (step == TRY_ENGINEER && activeRole == ENGINEER) {
+            tell(Lesson.Picture.ENGINEER, "THE ENGINEER (2)",
+                    "Clears rubble that blocks the way, and lifts debris off trapped survivors. E works when "
+                    + "you face rubble or a trapped survivor. Test it now on the marked rubble.", null, null);
+        }
+        if (step == TRY_DOG && activeRole == DOG_HANDLER) {
+            tell(Lesson.Picture.DOG_HANDLER, "THE DOG HANDLER (3)",
+                    "The dog smells hidden people up to 8 steps away, even through rubble and taped doors. E "
+                    + "works anywhere: use it when you don't know where people are. Faint paw prints show how "
+                    + "far it reaches. Test it now: stand on the marked spot by the door and press E.",
+                    null, null);
+        }
+        for (Survivor survivor : board.getSurvivors()) {
+            if (!survivor.isWaiting() || !board.isVisible(survivor.getRow(), survivor.getCol())) {
+                continue;
+            }
+            int[] spot = {survivor.getRow(), survivor.getCol()};
+            if (survivor.getInjuryName().equals("Minor")) {
+                tell(Lesson.Picture.MINOR, "GREEN TAG: MINOR INJURY",
+                        "They can walk. Walk into them and they follow you. Lead them to the EXIT, the green "
+                        + "door where you started. Only one person can follow you at a time.", spot, "GREEN TAG");
+            } else if (survivor.isTrapped()) {
+                tell(Lesson.Picture.TRAPPED, "YELLOW TAG, TRAPPED",
+                        "A serious injury: they can't walk, and debris pins them down. First the Engineer faces "
+                        + "them and presses E to lift the debris. Then walk into them to carry them to the EXIT "
+                        + "(carrying is slower). You can carry one person and lead one at the same time.",
+                        spot, "TRAPPED");
+            } else if (survivor.getInjuryName().equals("Critical")) {
+                tell(Lesson.Picture.CRITICAL, "RED TAG: CRITICAL",
+                        "Too hurt to move, so nobody can carry them. The Medic faces them and presses E to "
+                        + "stabilise them. Then anyone presses Q next to them to call backup: a stretcher team "
+                        + "comes from the EXIT and carries them out, so you can keep going.", spot, "RED TAG");
+            }
+        }
+        if (step >= SEARCH) {
+            int[] fire = visibleFire(board);
+            if (fire != null) {
+                tellFire(fire);
+            }
+        }
+    }
+
+    /** When the hall opens: the camera is sent to its fire, lit up so it can be seen in the dark. */
+    private void tellAboutFire(GameBoard board) {
+        for (int row = 0; row < board.getRows(); row++) {
+            for (int col = 0; col < board.getCols(); col++) {
+                if (board.getTile(row, col).isBurning()) {
+                    for (int r = row - 1; r <= row + 1; r++) {
+                        for (int c = col - 2; c <= col + 2; c++) {
+                            if (board.inBounds(r, c)) {
+                                board.getTile(r, c).markExplored();
+                            }
+                        }
+                    }
+                    tellFire(new int[] {row, col});
+                    return;
+                }
+            }
+        }
+    }
+
+    private void tellFire(int[] fire) {
+        tell(Lesson.Picture.FIRE, "FIRE SPREADS",
+                "Watch: fire spreads to the floor next to it. In real levels it keeps spreading through "
+                + "the rooms every few seconds, then burns out and leaves burnt floor. It hurts whoever "
+                + "stands next to it (only the role on the map gets hurt, so changing role can save "
+                + "you), and it can reach survivors. Walk around it, and get people away from it.",
+                fire, "FIRE");
+    }
+
+    /**
+     * The fire card's demonstration: fire takes one more floor tile next to it
+     * (never one with a survivor or the rescuer on it). Returns where, or null.
+     */
+    public int[] spreadFireDemo(GameBoard board) {
+        Rescuer rescuer = board.getActiveRescuer();
+        for (int row = 0; row < board.getRows(); row++) {
+            for (int col = 0; col < board.getCols(); col++) {
+                if (!board.getTile(row, col).isBurning()) {
+                    continue;
+                }
+                for (Direction direction : new Direction[] {Direction.DOWN, Direction.UP}) {
+                    int r = row + direction.getRowChange();
+                    int c = col + direction.getColChange();
+                    boolean free = board.inBounds(r, c) && board.getTile(r, c).isFlammable()
+                            && board.getSurvivorAt(r, c) == null
+                            && !(r == rescuer.getRow() && c == rescuer.getCol());
+                    if (free) {
+                        board.replaceTile(r, c, new Fire(r, c));
+                        return new int[] {r, c};
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private static int[] visibleFire(GameBoard board) {
+        for (int row = 0; row < board.getRows(); row++) {
+            for (int col = 0; col < board.getCols(); col++) {
+                if (board.isVisible(row, col) && board.getTile(row, col).isBurning()) {
+                    return new int[] {row, col};
+                }
+            }
+        }
+        return null;
     }
 
     /** Inside a step: who it's about, once they can be named. */
@@ -199,7 +348,10 @@ public class Tutorial {
                 if (!clearedRubble) {
                     return 0;                                         // clear the rubble
                 }
-                return countTrapped(board) > 0 ? 1 : 2;               // lift the debris, then carry them
+                if (countTrapped(board) > 0) {
+                    return 1;                                         // lift the debris
+                }
+                return board.getActiveRescuer().isCarrying() ? 3 : 2; // walk into them, then carry them out
             case RED:
                 return treated ? 1 : 0;                               // treat, then Q
             case BRING_OUT:
@@ -216,7 +368,7 @@ public class Tutorial {
             case TRY_ENGINEER:
                 return practisedClear;
             case TRY_DOG:
-                return practisedScent;
+                return practisedScent && countRevealed(board) > 0; // the dog really found someone
             case TRY_MEDIC:
                 return practisedTreat;
             case GREEN:
@@ -242,7 +394,7 @@ public class Tutorial {
         switch (stepNumber) {
             case GREEN:
                 openGate(board, ROOM_2_GATE);
-                turns.setHelpCallsOn(true);
+                turns.setHelpCallsOn(countRevealed(board) == 0); // the dog usually found them already
                 focus = null;
                 break;
             case YELLOW:
@@ -257,9 +409,27 @@ public class Tutorial {
                 turns.setSurvivorsWeaken(true);
                 focus = firstSurvivor(board, false); // the one nobody has seen yet
                 rememberCheckpoint(board);
+                tell(Lesson.Picture.CLOCK, "EVERY SURVIVOR HAS A TIMER",
+                        "From now on survivors get weaker. Each one you find shows the seconds they have left "
+                        + "under them: orange at 30 s, red at 10 s. At 0 they don't make it. The Medic's Treat "
+                        + "gives them more time. In real levels the timers run from the very start, and people "
+                        + "you haven't found call HELP when you are close.", null, null);
+                tellAboutFire(board); // the hall's fire, shown when the hall opens (it may be out of sight)
+                break;
+            case DIG:
+                if (focus != null) {
+                    tell(Lesson.Picture.SERIOUS, "FOUND BY SCENT",
+                            "The dog found someone behind the rubble. They are a yellow tag: they can't walk. "
+                            + "Clear the marked rubble with the Engineer, then carry them to the EXIT before "
+                            + "their time runs out.", new int[] {focus.getRow(), focus.getCol()}, "FOUND");
+                }
                 break;
             case BRING_OUT:
-                turns.startAftershockNear(rescuer.getRow(), rescuer.getCol());
+                turns.startAftershockNear(rescuer.getRow(), rescuer.getCol()); // counts down after the card
+                tell(Lesson.Picture.AFTERSHOCK, "AFTERSHOCK!",
+                        "The ground is about to shake again. The floor flashing orange will collapse into "
+                        + "rubble: step off it before it falls, or whoever stands there gets hurt. In real "
+                        + "levels aftershocks keep coming, each with a warning like this.", null, null);
                 break;
             default:
                 break;
@@ -362,6 +532,8 @@ public class Tutorial {
                 return activeRole == ENGINEER ? nearest(board, true) : null;
             case TRY_MEDIC:
                 return activeRole == MEDIC ? nearest(board, false) : null;
+            case TRY_DOG:
+                return activeRole == DOG_HANDLER ? sniffSpot(board) : null;
             case YELLOW:
                 return part == 0 ? firstRubble(board) : focusSpot();
             case GREEN:
@@ -391,6 +563,8 @@ public class Tutorial {
                 return "RUBBLE: E";
             case TRY_MEDIC:
                 return "DUMMY: E";
+            case TRY_DOG:
+                return "SNIFF HERE: E";
             case YELLOW:
                 return part == 0 ? "RUBBLE: E" : part == 1 ? "TRAPPED: E" : "WALK INTO THEM";
             case RED:
@@ -411,33 +585,34 @@ public class Tutorial {
         switch (step) {
             case WALK:
                 return "Walk with W A S D or the arrow keys. Hold a key to keep walking.";
+            case TRY_MEDIC:
+                if (activeRole != MEDIC) {
+                    return "Press 1 to become the Medic.";
+                }
+                return "MEDIC: test your ability now. Face the marked training dummy and press E.";
             case TRY_ENGINEER:
                 if (activeRole != ENGINEER) {
-                    return "You are one rescuer with three roles: Medic (1), Engineer (2) and Dog Handler (3). "
-                            + "Each has its own ability on E. Press 2 to become the Engineer.";
+                    return "Treated! Now press 2 to become the Engineer.";
                 }
-                return "ENGINEER: clears rubble. Test your ability now: walk up to the marked rubble, "
-                        + "face it and press E.";
+                return "ENGINEER: test your ability now. Walk up to the marked rubble, face it and press E.";
             case TRY_DOG:
                 if (activeRole != DOG_HANDLER) {
                     return "Rubble cleared! Now press 3 to become the Dog Handler.";
                 }
-                return "DOG HANDLER: the dog smells hidden people up to 8 steps away, even through rubble. "
-                        + "Test your ability now: press E.";
-            case TRY_MEDIC:
-                if (activeRole != MEDIC) {
-                    return "Nobody is hiding in this room, so the dog found no scent. "
-                            + "Press 1 to become the Medic.";
+                if (practisedScent) {
+                    return "Too far: the scent reaches 8 steps. Stand on the marked spot by the door and press "
+                            + "E again.";
                 }
-                return "MEDIC: treats the injured, which gives them more time. Test your ability now: "
-                        + "face the marked dummy and press E.";
+                return "DOG HANDLER: test your ability now. Stand on the marked spot by the taped door and "
+                        + "press E: the dog will smell who is in the next room.";
             case GREEN:
                 if (part == 0) {
                     return "A door has opened. Someone is calling for HELP: go through the door and walk "
                             + "towards the call.";
                 }
                 if (part == 1) {
-                    return "Green tag = minor injury: they can walk. Walk into them and they follow you.";
+                    return "The door is open. Go to the person the dog found and walk into them: they "
+                            + "follow you.";
                 }
                 return "Lead them to the EXIT, the green door where you started. Follow the green EXIT marker.";
             case YELLOW:
@@ -448,6 +623,9 @@ public class Tutorial {
                 if (part == 1) {
                     return "The marked survivor is TRAPPED. As the Engineer, face them and press E to lift "
                             + "the debris.";
+                }
+                if (part == 3) {
+                    return "Carry them to the EXIT: follow the green EXIT marker. Carrying is slower.";
                 }
                 return "Yellow tag = serious injury: they can't walk. Walk into them to carry them to the EXIT.";
             case RED:
@@ -595,6 +773,39 @@ public class Tutorial {
             }
         }
         return best;
+    }
+
+    /**
+     * The dog test's spot: the floor beside the first taped door (gate 1), on the
+     * player's side, nearest the rescuer. From there the green survivor is
+     * within the scent's 8 steps.
+     */
+    private int[] sniffSpot(GameBoard board) {
+        if (sniffSpot != null) {
+            return sniffSpot;
+        }
+        Rescuer rescuer = board.getActiveRescuer();
+        int bestDistance = Integer.MAX_VALUE;
+        for (int row = 0; row < board.getRows(); row++) {
+            for (int col = 0; col < board.getCols(); col++) {
+                if (!board.getTile(row, col).opensWithGate(ROOM_2_GATE)) {
+                    continue;
+                }
+                for (Direction direction : Direction.values()) {
+                    int r = row + direction.getRowChange();
+                    int c = col + direction.getColChange();
+                    if (!board.inBounds(r, c) || !board.getTile(r, c).isWalkable()) {
+                        continue;
+                    }
+                    int distance = Math.abs(r - rescuer.getRow()) + Math.abs(c - rescuer.getCol());
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        sniffSpot = new int[] {r, c};
+                    }
+                }
+            }
+        }
+        return sniffSpot;
     }
 
     private int[] firstRubble(GameBoard board) {

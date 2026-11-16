@@ -25,7 +25,7 @@ public class AssetManager implements Disposable {
     private static final String[] IMAGE_KEYS = {
         "floor", "cracked_floor", "burnt_floor", "wall", "rubble", "fire", "exit", "barrier", "dummy", "props",
         "decor", "medic", "engineer", "dog_handler", "survivor_minor", "survivor_serious", "survivor_critical",
-        "dog", "carry_icon", "emote", "paramedic", "stretcher", "flare", "puff"
+        "dog", "carry_icon", "emote", "paramedic", "stretcher", "flare", "puff", "props_tall"
     };
 
     private final HashMap<String, Texture> textures;

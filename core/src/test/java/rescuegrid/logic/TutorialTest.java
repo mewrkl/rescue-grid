@@ -48,6 +48,9 @@ class TutorialTest {
 
         // 8: the hidden survivor is behind rubble: only the dog can find them
         assertTrue(tutorial.isClockRunning());
+        java.util.List<String> hallCards = drainLessons();
+        assertTrue(hallCards.contains("EVERY SURVIVOR HAS A TIMER"), "the clock is explained first");
+        assertTrue(hallCards.contains("FIRE SPREADS"), "and the hall's fire, even before it's in sight");
         assertEquals(4, tutorial.getChapterNumber());
         assertArrayEquals(new int[] {6, 26}, tutorial.takeDoorToShow(), "the hall door nearest you is shown");
         assertTrue(tutorial.canUseAbility("Scent"));
@@ -71,6 +74,7 @@ class TutorialTest {
         assertTrue(found.contains("found"), found);
         tutorial.onAbility(dogHandler.getSpecialName());
         expectStep(9);
+        assertTrue(drainLessons().contains("FOUND BY SCENT"));
 
         // 9: the Engineer clears the rubble in front of their room
         assertArrayEquals(new int[] {10, 16}, tutorial.getMarker(board), "the rubble to clear is marked");
@@ -85,6 +89,7 @@ class TutorialTest {
 
         // 10: the aftershock, warned about, then it hits; then carry them out
         assertTrue(turns.isAftershockComing());
+        assertTrue(drainLessons().contains("AFTERSHOCK!"), "a card explains it before it hits");
         assertTrue(tutorial.getPrompt().startsWith("AFTERSHOCK"), tutorial.getPrompt());
         assertNull(tutorial.getMarker(board), "first: step off the orange tiles");
         runFor(TurnManager.WARNING_SECONDS + 0.5);
@@ -102,6 +107,13 @@ class TutorialTest {
         assertEquals(11, tutorial.getStepCount(), "17 steps merged into 11 (decision 0023)");
         assertTrue(turns.evacuate());
         assertTrue(turns.isSuccess());
+    }
+
+    @Test
+    void theFireCardShowsFireSpreading() {
+        int[] spread = tutorial.spreadFireDemo(board);
+        assertTrue(spread != null && board.getTile(spread[0], spread[1]).isBurning(), "one more tile burns");
+        assertNull(board.getSurvivorAt(spread[0], spread[1]), "never onto a person");
     }
 
     @Test
@@ -143,6 +155,7 @@ class TutorialTest {
         assertFalse(tutorial.canUseAbility("Treat"));
         assertFalse(tutorial.canUseAbility("Scent"));
         assertFalse(tutorial.canCallBackup());
+        assertNull(takeLessonTitle(), "no card while you learn to walk");
         assertFalse(board.getTile(3, 6).isWalkable(), "the first door starts closed");
         assertNull(tutorial.getMarker(board));
 
@@ -152,34 +165,11 @@ class TutorialTest {
         tutorial.onDirection(Direction.RIGHT);
         expectStep(2);
 
-        // 2-4: become each role and test its E in the first room
-        assertTrue(tutorial.canChangeRole());
-        assertTrue(tutorial.canUseAbility("Clear Rubble"));
-        assertFalse(tutorial.canUseAbility("Scent"));
-        assertNull(tutorial.getMarker(board), "first press 2: the rubble is marked once you're the Engineer");
-        assertTrue(tutorial.getPrompt().contains("Press 2"), tutorial.getPrompt());
-        switchTo(1);
-        assertArrayEquals(new int[] {5, 2}, tutorial.getMarker(board), "the practice rubble");
-        assertTrue(tutorial.getPrompt().contains("Test your ability"), tutorial.getPrompt());
-        Rescuer practising = board.getActiveRescuer();
-        practising.moveTo(4, 2);
-        practising.setFacing(Direction.DOWN);
-        practising.specialAction(board);
-        tutorial.onAbility(practising.getSpecialName());
-        expectStep(3);
-        assertTrue(tutorial.canUseAbility("Scent"));
-        assertFalse(tutorial.canUseAbility("Clear Rubble"));
-        switchTo(2);
-        Rescuer sniffing = board.getActiveRescuer();
-        String scent = sniffing.specialAction(board);
-        assertEquals("No scent within 8 steps. Search further in", scent,
-                "the closed door keeps the scent in this room");
-        assertEquals(DogHandler.MISS_COOLDOWN_SECONDS, sniffing.getSpecialCooldown(), 1e-9,
-                "a sniff that finds nobody only costs a short recharge");
-        tutorial.onAbility(sniffing.getSpecialName());
-        expectStep(4);
+        // 2: the Medic first (you start as the Medic): a card explains it, then treat the dummy
+        assertEquals("THE MEDIC (1)", takeLessonTitle());
+        assertFalse(tutorial.canChangeRole(), "no other roles until the Medic is tested");
         assertTrue(tutorial.canUseAbility("Treat"));
-        switchTo(0);
+        assertFalse(tutorial.canUseAbility("Clear Rubble"));
         assertArrayEquals(new int[] {4, 4}, tutorial.getMarker(board), "the dummy");
         assertEquals("DUMMY: E", tutorial.getMarkerLabel());
         Rescuer medicPractising = board.getActiveRescuer();
@@ -187,10 +177,52 @@ class TutorialTest {
         medicPractising.setFacing(Direction.RIGHT);
         assertTrue(medicPractising.specialAction(board).startsWith("Treated"));
         tutorial.onAbility(medicPractising.getSpecialName());
-        expectStep(5);
-        assertFalse(tutorial.canUseAbility("Treat"), "back to locked until the red survivor");
+        expectStep(3);
 
-        // 5: a door opens: the camera is sent there once, and it stays marked until you go through
+        // 3: the Engineer: press 2, a card, then clear the practice rubble
+        assertTrue(tutorial.canChangeRole());
+        assertTrue(tutorial.canUseAbility("Clear Rubble"));
+        assertFalse(tutorial.canUseAbility("Treat"));
+        assertNull(tutorial.getMarker(board), "first press 2: the rubble is marked once you're the Engineer");
+        assertTrue(tutorial.getPrompt().contains("press 2"), tutorial.getPrompt());
+        assertNull(takeLessonTitle(), "the Engineer's card waits until you are the Engineer");
+        switchTo(1);
+        assertEquals("THE ENGINEER (2)", takeLessonTitle());
+        assertArrayEquals(new int[] {5, 2}, tutorial.getMarker(board), "the practice rubble");
+        assertTrue(tutorial.getPrompt().contains("test your ability"), tutorial.getPrompt());
+        Rescuer practising = board.getActiveRescuer();
+        practising.moveTo(4, 2);
+        practising.setFacing(Direction.DOWN);
+        practising.specialAction(board);
+        tutorial.onAbility(practising.getSpecialName());
+        expectStep(4);
+
+        // 4: the Dog Handler really finds someone: the green survivor, through the taped door
+        assertTrue(tutorial.canUseAbility("Scent"));
+        assertFalse(tutorial.canUseAbility("Clear Rubble"));
+        switchTo(2);
+        assertEquals("THE DOG HANDLER (3)", takeLessonTitle());
+        assertArrayEquals(new int[] {3, 5}, tutorial.getMarker(board), "the spot by the taped door");
+        assertEquals("SNIFF HERE: E", tutorial.getMarkerLabel());
+        Rescuer sniffing = board.getActiveRescuer();
+        String tooFar = sniffing.specialAction(board); // still where the Engineer cleared the rubble
+        assertEquals("No scent within 8 steps. Search further in", tooFar);
+        assertEquals(DogHandler.MISS_COOLDOWN_SECONDS, sniffing.getSpecialCooldown(), 1e-9,
+                "a sniff that finds nobody only costs a short recharge");
+        tutorial.onAbility(sniffing.getSpecialName());
+        expectStep(4);
+        assertTrue(tutorial.getPrompt().startsWith("Too far"), tutorial.getPrompt());
+        sniffing.tick(DogHandler.MISS_COOLDOWN_SECONDS);
+        sniffing.moveTo(3, 5);
+        String found = sniffing.specialAction(board);
+        assertTrue(found.contains("found 1 survivor"), found);
+        tutorial.onAbility(sniffing.getSpecialName());
+        Survivor minor = board.getSurvivorAt(4, 10);
+        assertTrue(minor.isRevealed(), "the dog smelled them through the tape");
+        expectStep(5);
+        assertFalse(tutorial.canUseAbility("Treat"), "locked until the red survivor");
+
+        // 5: the door opens: the camera is sent there once, and it stays marked until you go through
         assertEquals(2, tutorial.getChapterNumber());
         assertTrue(board.getTile(3, 6).isWalkable(), "the first door opens");
         assertArrayEquals(new int[] {3, 6}, tutorial.takeDoorToShow());
@@ -199,15 +231,15 @@ class TutorialTest {
         assertTrue(tutorial.isShowingDoor());
         Rescuer medic = board.getActiveRescuer();
         medic.moveTo(3, 6);
+        new MovementCalculator().computeSight(board, medic);
         tutorial.update(board, turns);
         assertFalse(tutorial.isShowingDoor(), "through the door: the marker moves on");
+        medic.moveTo(3, 7);                          // sight reaches 4 steps: now they're in view
+        new MovementCalculator().computeSight(board, medic);
+        assertEquals("GREEN TAG: MINOR INJURY", takeLessonTitle(), "seeing them stops the game to explain");
 
-        // 5, continued: find the minor survivor, they follow, lead them out (one step, three parts)
-        assertTrue(tutorial.getPrompt().contains("calling for HELP"), tutorial.getPrompt());
-        Survivor minor = board.getSurvivorAt(4, 10);
-        minor.reveal();
-        expectStep(5);
-        assertTrue(tutorial.getPrompt().startsWith("Green tag"), tutorial.getPrompt());
+        // 5, continued: walk into them, they follow, lead them out (one step, several parts)
+        assertTrue(tutorial.getPrompt().startsWith("The door is open"), tutorial.getPrompt());
         assertArrayEquals(new int[] {4, 10}, tutorial.getMarker(board));
         medic.moveTo(4, 9);
         minor.reachedBy(medic);
@@ -284,6 +316,23 @@ class TutorialTest {
             turns.takeEvents();
             tutorial.update(board, turns);
         }
+    }
+
+    /** Every card waiting to be shown, by title. */
+    private java.util.List<String> drainLessons() {
+        tutorial.update(board, turns);
+        java.util.List<String> titles = new java.util.ArrayList<>();
+        for (Lesson lesson = tutorial.takeLesson(); lesson != null; lesson = tutorial.takeLesson()) {
+            titles.add(lesson.getTitle());
+        }
+        return titles;
+    }
+
+    /** The next stop-and-read card's title, or null (decision 0025). */
+    private String takeLessonTitle() {
+        tutorial.update(board, turns);
+        Lesson lesson = tutorial.takeLesson();
+        return lesson == null ? null : lesson.getTitle();
     }
 
     private void expectStep(int number) {

@@ -84,22 +84,23 @@ public class MovementCalculator {
     /**
      * Recursive flood fill. best[row][col] is the most steps we had left when we
      * reached that tile (-1 = not reached), so no tile is explored twice for nothing.
+     * byScent: the dog's scent, which also passes rubble and taped doors (Tile.letsScentThrough).
      */
     private void explore(GameBoard board, int row, int col, int stepsLeft, int[][] best,
-                         boolean passThroughRubble) {
+                         boolean byScent) {
         if (!board.inBounds(row, col) || stepsLeft <= best[row][col]) {
             return; // off the map, or already reached with at least as many steps
         }
         best[row][col] = stepsLeft; // this tile is reached
 
         Tile tile = board.getTile(row, col);
-        boolean canContinue = tile.isSeeThrough() || (passThroughRubble && tile.isClearable());
+        boolean canContinue = byScent ? tile.letsScentThrough() : tile.isSeeThrough();
         if (!canContinue || stepsLeft == 0) {
             return; // we can see a wall, but not past it
         }
         for (Direction direction : Direction.values()) {
             explore(board, row + direction.getRowChange(), col + direction.getColChange(),
-                    stepsLeft - 1, best, passThroughRubble); // the recursive call
+                    stepsLeft - 1, best, byScent); // the recursive call
         }
     }
 

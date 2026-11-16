@@ -18,25 +18,31 @@ You need a JDK 17 or newer (IntelliJ can download one, for example Corretto). Yo
 ```
 gradlew lwjgl3:run      (Windows)
 ./gradlew lwjgl3:run    (Mac / Linux)
-gradlew test            (run the 68 rule tests)
+gradlew test            (run the 82 rule tests)
 ```
 
 On a Mac, run the game through Gradle as above, not by running `Main` directly: the window needs a special Java setting there, and the Gradle task adds it for you.
 
 ## How to win a level
 
-Start Game begins with a short **training level** that teaches everything one step at a time (Skip Training goes straight to Level 1).
+The first time you press **Play**, the game asks whether to play the short **training level** first. It teaches everything one step at a time, starting with a test of each role's ability in the first room. After that, Play goes straight to Level 1, **Continue** picks up at the furthest level you have opened, and **Level Select** replays any level (including the training). **Options** has music and sound volume, fullscreen (or press F11) and a progress reset.
+
+Each level starts with a **briefing card** (the target, what's new, the three star goals); press Enter when you're ready, and the clock starts then.
 
 You start beside the EXIT. Survivors you haven't found yet call for **HELP** when you are close: follow the ring or the arrow. Each survivor has a triage tag:
 
 | Tag | What to do |
 |---|---|
-| Green (minor) | Walk onto them: they follow you to the EXIT |
-| Yellow (serious) | Walk onto them to carry them (slower) |
+| Green (minor) | Walk into them: they follow you to the EXIT |
+| Yellow (serious) | Walk into them to carry them (slower) |
 | Red (critical) | Change to the Medic and treat them (E), then press Q: backup carries them out 10 s later |
 | Debris on them (trapped) | Change to the Engineer and lift it (E) first |
 
 The **objective card** in the top-left corner says what to do next. The **SURVIVORS** boxes in the sidebar fill up as you save people; the solid boxes are the ones you must save, the dashed ones are optional. Once you've saved enough, step onto the EXIT with empty hands to leave, or stay and save the rest for a bonus. Survivors start in different places each time you play.
+
+A found survivor who is running out of time beeps and pulses red at 30 s and at 10 s. If nothing moves forward for 20 s, the radio repeats what to do next.
+
+**Stars:** one for rescuing the target, one for rescuing everyone, one if no role goes down. The result screen shows which you got, why a mission failed, and a tip; your best stars are saved.
 
 ## Controls
 
@@ -46,7 +52,8 @@ The **objective card** in the top-left corner says what to do next. The **SURVIV
 | 1 / 2 / 3, Tab | Change role to Medic / Engineer / Dog Handler, or to the next one (takes 1 s) |
 | E | Special action on the tile you face (dashed outline) |
 | Q | Call backup for a stabilised critical survivor |
-| Esc | Pause (then R restarts, M goes to the menu) |
+| Esc | Pause menu: Resume, Restart Level, How to Play, Options, Main Menu (restarting or leaving asks first) |
+| F11 | Fullscreen on/off |
 | Menus | Arrow keys or W/S to choose, Enter or Space to select, Esc to go back (the mouse works too) |
 
 ## Project layout
@@ -55,7 +62,7 @@ The **objective card** in the top-left corner says what to do next. The **SURVIV
 |---|---|
 | `core/` | The whole game: rules (`logic`, `model`), screens (`ui`), drawing (`graphics`), images and sounds (`assets`), and the JUnit tests |
 | `lwjgl3/` | The desktop launcher, `rescuegrid.Main`, which opens the window |
-| `assets/` | Levels, sounds, music, fonts, and images (empty until sprites are made) |
+| `assets/` | Levels, sounds, music, fonts, and the sprite sheets in `images/` |
 | `tools/` | `SoundMaker.java`, our sound generator (not part of the game) |
 
 ## What's used besides plain Java
@@ -74,19 +81,29 @@ All the game rules (movement, sight, fire, aftershocks, survivors, scoring) are 
 - **Exploring:** real-time tile movement with smooth sliding, a following camera, recursive line-of-sight fog, and a minimap.
 - **Your team:** one rescuer with three roles, each with its own health, special and cooldown.
 - **Survivors:** minor, serious and critical types, trapped survivors, backup, and calls for help.
-- **Guidance:** an objective checklist on the map and a step-by-step training level.
+- **Guidance:** an objective checklist and labelled side panel, a "next step" line on the map, a step-by-step training level, a briefing before each level, low-time warnings, a hint when you're stuck, the Dog Handler's scent range shown as paw prints, and E and Q dimmed when they can't act.
 - **The building:**
   - Fire spreads, hurts rescuers, and burns out.
   - Aftershocks come with a warning, collapse cracked floor, cause random collapses, and shake the screen.
-- **Screens and scoring:** health, downed roles, win and lose, the score breakdown, plus menu, How to Play, pause and result screens.
-- **Placeholder art drawn in code:** brick walls, rock piles, flickering fire, and rescuers with role icons.
+- **Screens and grading:** health, downed roles, win and lose, and 3 stars per level (saved; stars are the only grade), plus menu, Level Select, How to Play, pause and result screens.
+- **Backup you can see:** after a radio call, a paramedic stretcher team walks in from the EXIT, lifts the red survivor and carries them out.
+- **Our own pixel art** (`tools/SpriteMaker.java`): an angled RPG view with brick walls, rescuers who walk in four directions and carry their own gear (a medic pack, a crowbar, a K9 vest and leash), hurt survivors (each triage colour has its own pose, and a bouncing "!" bubble shows who still needs you), the Dog Handler's dog, flickering fire, and furniture in every level (a home, an office, a hospital), some of it damaged by the quake. Placeholder shapes drawn in code are the fallback.
 - **Sound effects and music** generated by `tools/SoundMaker.java`.
 
 ## Not built yet
 
-- **Sprites:** the 16 × 16 pixel-art sprites are planned in section 10 of the plan. Until they exist the game uses the placeholder art. To use a sprite, drop a PNG named after its key (for example `assets/images/medic.png`) and it appears automatically.
 - **Balancing:** every number marked *(tune)* in the plan needs playtesting, especially the new survivor types and the backup time.
 - **Possible extras:** box2dlights lighting, and Tiled maps once sprites exist (plan section 3).
+
+## Remaking the sprites
+
+Every sprite is drawn from code by `tools/SpriteMaker.java` (decision 0016). From the project folder:
+
+```
+java tools/SpriteMaker.java
+```
+
+It rewrites `assets/images/*.png` and `tools/sprite_preview.png` (all sheets at 4×, to check them in one look). If a PNG is missing, the game falls back to its placeholder shapes.
 
 ## Remaking the sounds
 
